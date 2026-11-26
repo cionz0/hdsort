@@ -99,20 +99,22 @@ The strategy itself is chosen later, in an ADR written at the start of prompt 07
 
 ## UC-4 Apply the confirmed plan
 
-The owner asks hdsort to carry out the decisions. hdsort checks the plan, moves confirmed deletes to Trash, and only then records survivors.
+The owner asks hdsort to carry out the decisions. hdsort checks the plan, moves confirmed deletes to Trash, renames confirmed moves inside the scan root, and only then records survivors at their final paths.
 
 ```mermaid
 sequenceDiagram
   actor Owner
   participant Apply as Apply use case
   participant Trash as Trash port
+  participant Disk as Filesystem
   participant Library as Library repository
   Owner->>Apply: Apply session
   Apply->>Apply: Reject unconfirmed deletes and last-copy loss
   Apply->>Trash: Move each confirmed delete
   alt Every trash call succeeded
     Trash-->>Apply: Ok
-    Apply->>Library: Upsert survivors
+    Apply->>Disk: Rename each confirmed move inside the root
+    Apply->>Library: Upsert survivors at their final paths
     Apply-->>Owner: Session applied
   else A trash call failed
     Trash-->>Apply: Error

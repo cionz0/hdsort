@@ -70,6 +70,51 @@ func RestoreSession(s Session, status SessionStatus) (Session, error) {
 	}
 }
 
+// RecordDecision stores a keep, delete, or skip for path on an open session.
+// A later decision for the same path replaces the earlier one. The input
+// session is left unchanged.
+func RecordDecision(s Session, path string, choice Choice) (Session, error) {
+	if s.status != StatusOpen {
+		return s, ErrSessionNotOpen
+	}
+	decision, err := NewDecision(path, choice)
+	if err != nil {
+		return s, err
+	}
+	next := s
+	next.Decisions = append([]Decision(nil), s.Decisions...)
+	key := filepath.Clean(decision.Path)
+	for i, existing := range next.Decisions {
+		if filepath.Clean(existing.Path) == key {
+			next.Decisions[i] = decision
+			return next, nil
+		}
+	}
+	next.Decisions = append(next.Decisions, decision)
+	return next, nil
+}
+
+// ConfirmMove marks the proposal whose source is from. The move still does
+// not run until apply. The input session is left unchanged.
+func ConfirmMove(s Session, from string) (Session, error) {
+	if s.status != StatusOpen {
+		return s, ErrSessionNotOpen
+	}
+	if from == "" {
+		return s, fmt.Errorf("%w: move", ErrEmptyPath)
+	}
+	key := filepath.Clean(from)
+	next := s
+	next.Moves = append([]LayoutMove(nil), s.Moves...)
+	for i, move := range next.Moves {
+		if filepath.Clean(move.From) == key {
+			next.Moves[i].Confirmed = true
+			return next, nil
+		}
+	}
+	return s, fmt.Errorf("session has no move from %s", from)
+}
+
 // ApplyResult records a successful apply by moving an open session to applied.
 // A session that is already applied returns an error. The input session is
 // left unchanged; the applied value is the returned copy.

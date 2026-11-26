@@ -2,7 +2,7 @@
 
 hdsort is a local program that scans a folder, finds duplicate files, asks the user before deleting anything, and records the files they kept. Later scans compare new folders with that record.
 
-The skeleton, the domain model, content identity, the keeper policy, and the SQLite library exist. Review and apply are what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
+The skeleton, the domain model, content identity, the keeper policy, the SQLite library, and apply exist. Review is what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
 
 ## System context
 
@@ -190,7 +190,7 @@ stateDiagram-v2
   open --> open: trash failed and the library was left unchanged
 ```
 
-Apply order is fixed (ADR-0004): validate the plan, trash the confirmed deletes, then upsert survivors at their post-move paths. A failed trash call leaves the library as it was.
+Apply order is fixed (ADR-0004): validate the plan, trash the confirmed deletes, rename each confirmed move inside the scan root, then upsert survivors at their final paths. An unconfirmed move stays a proposal. A failed trash call leaves the library as it was and leaves the session open.
 
 Dry-run (ADR-0009) runs that same validation and returns the operations apply would perform: Trash paths, confirmed moves, and library upserts at the survivors’ final paths. It does not call Trash, does not rename files, and does not write the library. The session stays `open`. A rejected plan returns the same rejection apply would return.
 

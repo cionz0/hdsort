@@ -45,8 +45,8 @@ func (s *Store) Save(session domain.Session) (string, error) {
 	}
 	for i, move := range session.Moves {
 		if _, err := tx.Exec(
-			`INSERT INTO moves (session_id, move_no, from_path, destination) VALUES (?, ?, ?, ?)`,
-			id, i, move.From, move.Destination,
+			`INSERT INTO moves (session_id, move_no, from_path, destination, confirmed) VALUES (?, ?, ?, ?, ?)`,
+			id, i, move.From, move.Destination, boolInt(move.Confirmed),
 		); err != nil {
 			return "", err
 		}
@@ -357,7 +357,7 @@ ORDER BY decision_no`, id)
 
 func loadMoves(db *sql.DB, id string) ([]domain.LayoutMove, error) {
 	rows, err := db.Query(`
-SELECT from_path, destination FROM moves
+SELECT from_path, destination, confirmed FROM moves
 WHERE session_id = ?
 ORDER BY move_no`, id)
 	if err != nil {
@@ -366,10 +366,14 @@ ORDER BY move_no`, id)
 	defer rows.Close()
 	var moves []domain.LayoutMove
 	for rows.Next() {
-		var move domain.LayoutMove
-		if err := rows.Scan(&move.From, &move.Destination); err != nil {
+		var (
+			move      domain.LayoutMove
+			confirmed int
+		)
+		if err := rows.Scan(&move.From, &move.Destination, &confirmed); err != nil {
 			return nil, err
 		}
+		move.Confirmed = confirmed != 0
 		moves = append(moves, move)
 	}
 	return moves, rows.Err()

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/cionz0/hdsort/internal/app"
 )
@@ -136,6 +137,23 @@ func (Opener) Open(path string) (io.ReadSeekCloser, error) {
 	return os.Open(path)
 }
 
+// Rename moves from to to, creating the destination directory when it is missing.
+func (Opener) Rename(from, to string) error {
+	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+		return err
+	}
+	return os.Rename(from, to)
+}
+
+// Stat reports size and modification time for a survivor about to be indexed.
+func (Opener) Stat(path string) (int64, time.Time, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0, time.Time{}, err
+	}
+	return info.Size(), info.ModTime(), nil
+}
+
 // Facts reports size and modification time. A missing path or a path that
 // is not a regular file is Exists false and not an error.
 func (Opener) Facts(path string) (app.FileFacts, error) {
@@ -160,4 +178,5 @@ var (
 	_ app.Walker        = (*Walker)(nil)
 	_ app.FileReader    = Opener{}
 	_ app.ReconcileDisk = Opener{}
+	_ app.Relocator     = Opener{}
 )

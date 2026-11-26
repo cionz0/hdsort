@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS moves (
   move_no INTEGER NOT NULL,
   from_path TEXT NOT NULL,
   destination TEXT NOT NULL,
+  confirmed INTEGER NOT NULL,
   PRIMARY KEY (session_id, move_no)
 );
 
@@ -157,7 +158,21 @@ func (s *Store) configure() error {
 	if _, err := s.db.Exec(schema); err != nil {
 		return err
 	}
-	return nil
+	return ensureMoveConfirmed(s.db)
+}
+
+// ensureMoveConfirmed adds the confirmation column on a library created
+// before moves recorded whether the owner confirmed them.
+func ensureMoveConfirmed(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('moves') WHERE name = 'confirmed'`).Scan(&n); err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil
+	}
+	_, err := db.Exec(`ALTER TABLE moves ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0`)
+	return err
 }
 
 // Put inserts or replaces the library row for the entry's content ID.

@@ -8,9 +8,11 @@ import (
 
 // LayoutMove is a proposed rename or relocation. It stays inactive until the
 // owner confirms it. NewLayoutMove rejects a destination outside the scan root.
+// Confirmed is false until ConfirmMove records the owner's confirmation.
 type LayoutMove struct {
 	From        string
 	Destination string
+	Confirmed   bool
 }
 
 // NewLayoutMove cleans root and destination and rejects a destination that
