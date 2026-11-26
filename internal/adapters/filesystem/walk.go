@@ -1,6 +1,7 @@
 package filesystem
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -135,7 +136,28 @@ func (Opener) Open(path string) (io.ReadSeekCloser, error) {
 	return os.Open(path)
 }
 
+// Facts reports size and modification time. A missing path or a path that
+// is not a regular file is Exists false and not an error.
+func (Opener) Facts(path string) (app.FileFacts, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return app.FileFacts{}, nil
+		}
+		return app.FileFacts{}, err
+	}
+	if !info.Mode().IsRegular() {
+		return app.FileFacts{}, nil
+	}
+	return app.FileFacts{
+		Exists:  true,
+		Size:    info.Size(),
+		ModTime: info.ModTime(),
+	}, nil
+}
+
 var (
-	_ app.Walker     = (*Walker)(nil)
-	_ app.FileReader = Opener{}
+	_ app.Walker        = (*Walker)(nil)
+	_ app.FileReader    = Opener{}
+	_ app.ReconcileDisk = Opener{}
 )

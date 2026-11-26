@@ -138,6 +138,13 @@ func hashRange(source app.FileReader, path string, offset, n int64) ([32]byte, e
 	return blake3.Sum256(buf), nil
 }
 
+// ContentID hashes one known file in full. Reconcile calls this so a
+// singleton large file still gets a digest. The staged Identify path is
+// unchanged.
+func (Hasher) ContentID(path string, source app.FileReader) (domain.ContentID, error) {
+	return fullID(source, path)
+}
+
 func fullID(source app.FileReader, path string) (domain.ContentID, error) {
 	f, err := source.Open(path)
 	if err != nil {
@@ -151,4 +158,7 @@ func fullID(source app.FileReader, path string) (domain.ContentID, error) {
 	return domain.ContentID(hex.EncodeToString(h.Sum(nil))), nil
 }
 
-var _ app.Identifier = Hasher{}
+var (
+	_ app.Identifier      = Hasher{}
+	_ app.ContentIDSource = Hasher{}
+)

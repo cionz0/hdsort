@@ -2,7 +2,7 @@
 
 hdsort is a local program that scans a folder, finds duplicate files, asks the user before deleting anything, and records the files they kept. Later scans compare new folders with that record.
 
-The skeleton, the domain model, content identity, and the keeper policy exist. Review and apply are what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
+The skeleton, the domain model, content identity, the keeper policy, and the SQLite library exist. Review and apply are what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
 
 ## System context
 
@@ -90,7 +90,7 @@ Port interfaces stay small and live next to the use case that calls them (Go Cod
 | File ref | Path, size, modification time, content ID, and whether the file was readable. |
 | Exact group | Two or more file refs with the same content ID. |
 | Similar group | Two or more file refs that a cited similarity strategy matched and whose content IDs differ. No delete recommendation. |
-| Library entry | A survivor: content ID, current path, time it was indexed. |
+| Library entry | A survivor: content ID, current path, size, modification time, indexed time, and whether it is stale. A stale entry is not a survivor. |
 | Recommendation | Optional. Keeper path, paths suggested for Trash, and one reason code. |
 | Decision | The user’s confirmation for one path: keep, delete, or skip. |
 | Layout move | A proposed rename or relocation inside the scan root. Inactive until confirmed. |
@@ -134,7 +134,7 @@ Walk rules, applied before hashing:
 
 The keeper policy is a Strategy. The default strategy ranks file refs that already share a content ID. Higher rank is the suggested keeper.
 
-1. `library_survivor` — this path is the current library entry for that content ID.
+1. `library_survivor` — this path is the current valid library entry for that content ID. A stale entry does not rank.
 2. `plain_name` — the file name does not match a generated-copy rule. The other names do.
 3. `newer_mtime_tiebreak` — the ranks above were equal, and this file’s modification time is later. The reason text says the time was only a tie-break.
 
@@ -151,7 +151,7 @@ A plan check in the domain rejects apply when:
 - any trashed path has no delete decision, or
 - the plan would remove every copy of a content ID that is not already in the library.
 
-A library entry counts only when it has a content ID and a path, and that path is not itself in the trash list. Trashing the library path as well as every in-scan copy is still last-copy loss.
+A library entry counts only when it has a content ID and a path and is not stale, and that path is not itself in the trash list. Trashing the library path as well as every in-scan copy is still last-copy loss.
 
 When the library entry’s path is outside the scan root, the recommendation keeps that library path and suggests trashing the in-scan copies. The library file is not moved. When the library path is inside the scan and the bytes still match, that path is the keeper inside the one exact group.
 
@@ -164,7 +164,7 @@ flowchart TD
   entry[Library entry whose path is inside the root]
   exists{File still at that path?}
   same{Content ID unchanged?}
-  refresh[Keep the entry and refresh metadata]
+  refresh[Refresh size, modification time, and indexed time]
   stale[Mark the entry stale]
   entry --> exists
   exists -->|no| stale
@@ -173,7 +173,7 @@ flowchart TD
   same -->|no| stale
 ```
 
-A stale entry is not a duplicate of the files found in this scan. Matching uses the entries that are still valid.
+Refresh keeps the content ID and the path, and writes the file's current size, modification time, and a new indexed time. Marking stale keeps the stored content ID and path. A stale entry is not a duplicate of the files found in this scan. Matching uses the entries that are still valid.
 
 ## Similarity
 

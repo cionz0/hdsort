@@ -1,6 +1,9 @@
 package domain
 
-import "path/filepath"
+import (
+	"fmt"
+	"path/filepath"
+)
 
 // SessionStatus is the lifecycle of one scan session.
 type SessionStatus string
@@ -27,8 +30,8 @@ type Skipped struct {
 }
 
 // Session is one scan: root, groups, decisions, layout moves, skipped paths,
-// and status. Status starts at open. ApplyResult is the only transition,
-// from open to applied.
+// and status. Status starts at open. ApplyResult moves an open session to
+// applied. RestoreSession reloads a status that was already stored.
 type Session struct {
 	Root      string
 	Exact     []ExactGroup
@@ -52,6 +55,19 @@ func NewSession(root string) Session {
 // Status returns open or applied.
 func (s Session) Status() SessionStatus {
 	return s.status
+}
+
+// RestoreSession returns a copy of s with status set.
+// Loading a saved session uses this. ApplyResult remains the only way an
+// open session becomes applied during a scan.
+func RestoreSession(s Session, status SessionStatus) (Session, error) {
+	switch status {
+	case StatusOpen, StatusApplied:
+		s.status = status
+		return s, nil
+	default:
+		return Session{}, fmt.Errorf("%w: %q", ErrSessionNotOpen, status)
+	}
 }
 
 // ApplyResult records a successful apply by moving an open session to applied.

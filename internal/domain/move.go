@@ -26,6 +26,13 @@ func NewLayoutMove(root, from, destination string) (LayoutMove, error) {
 	}, nil
 }
 
+// PathInside reports whether path is root or a file inside it.
+// The check is the same one layout moves use: filepath.Rel must not be ".."
+// and must not start with ".." plus a separator.
+func PathInside(root, path string) bool {
+	return destinationInsideRoot(root, path) == nil
+}
+
 func destinationInsideRoot(root, destination string) error {
 	if root == "" || destination == "" {
 		return fmt.Errorf("%w: empty path", ErrMoveOutsideRoot)

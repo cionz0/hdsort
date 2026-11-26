@@ -17,14 +17,20 @@ type FileRef struct {
 }
 
 // LibraryEntry is a survivor already recorded for a content ID.
+// Size and ModTime are the file metadata last reconciled.
+// Stale means the file is missing or its content ID changed; a stale entry
+// is not a survivor.
 type LibraryEntry struct {
 	ContentID ContentID
 	Path      string
+	Size      int64
+	ModTime   time.Time
 	IndexedAt time.Time
+	Stale     bool
 }
 
 // Valid reports whether the entry can count as the kept copy of its content ID.
-// An entry needs both a content ID and a path. A zero value is not a survivor.
+// An entry needs a content ID and a path, and it must not be stale.
 func (e LibraryEntry) Valid() bool {
-	return e.ContentID != "" && e.Path != ""
+	return e.ContentID != "" && e.Path != "" && !e.Stale
 }
