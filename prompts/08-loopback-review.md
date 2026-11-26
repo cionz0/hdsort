@@ -5,8 +5,9 @@ Implement this prompt only. Stop when its acceptance tests pass. Do not start pr
 ## Read first
 
 - `docs/architecture.md` (HTTP surface, synced-folder hint)
-- `docs/use-cases.md` (UC-2, UC-3, the banner paragraph)
+- `docs/use-cases.md` (UC-2, UC-3, UC-7, the banner paragraph)
 - `docs/adr/0002-loopback-web-ui-in-one-go-binary.md`
+- `docs/adr/0009-dry-run-on-the-review-page.md`
 - `docs/patterns.md` (Ports and Adapters, `crypto/rand`, `crypto/subtle`, Secure Contexts)
 
 ## Outcome
@@ -21,13 +22,14 @@ A loopback HTTP server serves the review page and the decision routes. Tests use
 - `GET /scans/{id}` returns JSON for an existing session.
 - `POST /scans/{id}/decisions` records a decision.
 - The review HTML shows exact groups and similar groups in two sections. It shows the recommendation reason when one exists, and it shows the synced-folder banner when a path segment of the root is `CloudStorage`, `Mobile Documents`, `Dropbox`, or `Google Drive`.
+- The review page has a Dry run control, separate from Apply, that POSTs to `/scans/{id}/dry-run`. The HTML response is the review page with the report and the sentence “Nothing was changed.” A request with `Accept: application/json` gets that report as JSON with `changed` set to false. A rejected plan returns the same rejection as apply, still with nothing written.
 - Missing token is 401. Wrong token is 401.
 
 `cmd/hdsort` with no arguments starts the listener and prints the capability URL. Opening the browser may use the OS open command; tests do not assert that the browser launched.
 
 ## Out of scope
 
-Starting a scan from the page (prompt 09), previews, apply route wiring if it is not required to render decisions. If apply is a one-line call to the prompt 06 use case, wiring `POST /scans/{id}/apply` here is allowed and then its acceptance test below is in scope. Prefer wiring it here so the page can finish UC-4.
+Starting a scan from the page (prompt 09) and previews. Wire `POST /scans/{id}/apply` and `POST /scans/{id}/dry-run` to the prompt 06 use cases so the page can finish UC-4 and UC-7.
 
 ## Acceptance tests
 
@@ -39,6 +41,8 @@ Starting a scan from the page (prompt 09), previews, apply route wiring if it is
 - `TestAcceptance_ReviewPageShowsSyncBanner` when the root contains a `Dropbox` path segment, and `TestAcceptance_ReviewPageOmitsSyncBanner` when it does not.
 - `TestAcceptance_PostDecisionPersists` and a following GET returns that decision.
 - `TestAcceptance_ApplyRouteTrashes`: `POST /scans/{id}/apply` with a confirmed delete performs UC-4 against the temp Trash and temp library.
+- `TestAcceptance_ReviewPageOffersDryRun`: the review HTML contains a Dry run control whose action is the dry-run route, and a separate Apply control.
+- `TestAcceptance_DryRunPageWritesNothing`: posting the dry-run route for a confirmed delete returns HTML that includes the delete path and the sentence “Nothing was changed.” The file is still at its original path, the library is unchanged, and the session is `open`. The JSON form of the same call has `changed` false and the same path.
 
 ## Patterns
 

@@ -6,14 +6,14 @@ Status below is the source of truth for “what is next.” The session that fin
 
 | Order | Prompt | Status | Outcome |
 | --- | --- | --- | --- |
-| 1 | [prompts/01-skeleton.md](../prompts/01-skeleton.md) | not started | Go module, package layout, version command, test workflow |
+| 1 | [prompts/01-skeleton.md](../prompts/01-skeleton.md) | done (`cmd/hdsort`) | Go module, package layout, version command, test workflow |
 | 2 | [prompts/02-domain-model.md](../prompts/02-domain-model.md) | not started | Groups, recommendations, plan checks |
 | 3 | [prompts/03-identify-and-group.md](../prompts/03-identify-and-group.md) | not started | Walk, staged BLAKE3, exact groups |
 | 4 | [prompts/04-keeper-policy.md](../prompts/04-keeper-policy.md) | not started | Explainable keeper ranking |
 | 5 | [prompts/05-library-and-match.md](../prompts/05-library-and-match.md) | not started | SQLite library, reconcile, match |
-| 6 | [prompts/06-plan-apply-layout.md](../prompts/06-plan-apply-layout.md) | not started | Decisions, Trash, index commit, default layout |
+| 6 | [prompts/06-plan-apply-layout.md](../prompts/06-plan-apply-layout.md) | not started | Decisions, Trash, index commit, dry-run report, default layout |
 | 7 | [prompts/07-similar-files.md](../prompts/07-similar-files.md) | not started | Cited similarity strategy, no delete suggestion |
-| 8 | [prompts/08-loopback-review.md](../prompts/08-loopback-review.md) | not started | Loopback server, token, review page and routes |
+| 8 | [prompts/08-loopback-review.md](../prompts/08-loopback-review.md) | not started | Loopback server, token, review page, dry-run control |
 | 9 | [prompts/09-scan-and-preview.md](../prompts/09-scan-and-preview.md) | not started | Start a scan from the page, previews by file id |
 | 10 | [prompts/10-release-binaries.md](../prompts/10-release-binaries.md) | not started | Cross-compiled GitHub Release binaries |
 

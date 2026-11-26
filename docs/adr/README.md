@@ -12,3 +12,4 @@ Format: Michael Nygard, “Documenting Architecture Decisions,” 2011. <https:/
 | [0006](0006-acceptance-tests-are-the-specification.md) | Acceptance tests are the specification | Accepted |
 | [0007](0007-staged-content-identity.md) | Staged content identity | Accepted |
 | [0008](0008-library-location.md) | Library location | Accepted |
+| [0009](0009-dry-run-on-the-review-page.md) | Dry-run is a review-page action | Accepted |

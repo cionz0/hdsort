@@ -15,7 +15,7 @@ Scans can attach similar groups. Those groups never carry a delete recommendatio
 
 ## First step, before code
 
-Write `docs/adr/0009-similarity-algorithms.md` that cites the algorithms you will implement and states the threshold.
+Write `docs/adr/0010-similarity-algorithms.md` that cites the algorithms you will implement and states the threshold. ADR-0009 is already the dry-run decision.
 
 Allowed citations:
 

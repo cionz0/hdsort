@@ -2,9 +2,9 @@
 
 hdsort scans a folder on your machine, finds duplicate files, and asks you before it deletes anything. Files you keep are recorded in a local library. The next scan compares the new folder both with itself and with that library.
 
-The review UI is a page served by the program on `127.0.0.1`. The files never leave the computer. Cloud copies are included only when a sync client has already stored them in a local folder.
+The review UI is a page served by the program on `127.0.0.1`. From that page the owner can dry-run the current decisions and see what would change; a dry-run writes nothing. The files never leave the computer. Cloud copies are included only when a sync client has already stored them in a local folder.
 
-This repository is the specification and the build plan. The program itself is not implemented yet. Each file in [`prompts/`](prompts/) is one implementation session, in the order listed in [`docs/development-plan.md`](docs/development-plan.md).
+This repository is the specification and the build plan. Product behavior is still ahead: the module, package tree, and version command exist. Each file in [`prompts/`](prompts/) is one implementation session, in the order listed in [`docs/development-plan.md`](docs/development-plan.md).
 
 ## Documentation
 
@@ -21,21 +21,20 @@ Project rules for contributors and agents live in [`.cursor/rules/`](.cursor/rul
 
 ## Build and run
 
-Not yet. Prompt 01 adds the Go module. Prompt 10 adds Release binaries for macOS, Linux, and Windows.
-
-When the module exists, the toolchain is Go 1.27 (stable 1.27.4 at the time of writing): <https://go.dev/dl/>.
+Toolchain: Go 1.27 (stable 1.27.4 at the time of writing): <https://go.dev/dl/>.
 
 ```bash
 go test ./...
 go vet ./...
-CGO_ENABLED=0 go build -o hdsort ./cmd/hdsort
+go build -o hdsort ./cmd/hdsort
+./hdsort
 ```
 
-`go` is required on a developer machine. A Release binary does not require a Go installation.
+`./hdsort` prints `hdsort v0.0.0`. A release build replaces that string with `-ldflags "-X main.version=vX.Y.Z"`. Prompt 10 adds the Release binaries for macOS, Linux, and Windows. A Release binary does not require a Go installation.
 
 ## Status
 
-Specification only. Next session: [`prompts/01-skeleton.md`](prompts/01-skeleton.md).
+Prompt 01 is done. Next session: [`prompts/02-domain-model.md`](prompts/02-domain-model.md).
 
 ## License
 

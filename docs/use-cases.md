@@ -10,12 +10,16 @@ flowchart LR
   uc2[UC-2 Review exact duplicates]
   uc3[UC-3 Review similar files]
   uc5[UC-5 Review layout proposals]
+  uc7[UC-7 Dry-run the plan]
   uc4[UC-4 Apply the confirmed plan]
   owner --> uc1
   uc1 --> uc6
   uc1 --> uc2
   uc1 --> uc3
   uc1 --> uc5
+  uc2 --> uc7
+  uc3 --> uc7
+  uc5 --> uc7
   uc2 --> uc4
   uc3 --> uc4
   uc5 --> uc4
@@ -163,6 +167,31 @@ sequenceDiagram
 ```
 
 A stale entry does not make the remaining files look like duplicates of a missing original. Two remaining copies still become an exact group by their own content IDs. One remaining copy is a survivor candidate, not a duplicate group.
+
+## UC-7 Dry-run the plan
+
+The owner asks the review page what the current decisions would do. hdsort runs the same checks as UC-4 and shows the Trash paths, the confirmed moves, and the library rows it would write. Files, Trash, and the library stay as they were. The session stays `open`. Apply remains a separate action.
+
+```mermaid
+sequenceDiagram
+  actor Owner
+  participant Page as Review page
+  participant Plan as Plan preview
+  participant Disk as Filesystem and library
+  Owner->>Page: Dry run
+  Page->>Plan: Same checks as apply
+  alt The plan is valid
+    Plan-->>Page: Trash list, moves, library upserts
+    Page-->>Owner: Report, and Nothing was changed
+    Note over Disk: No writes
+  else The plan is rejected
+    Plan-->>Page: Same rejection apply would return
+    Page-->>Owner: Rejection, and Nothing was changed
+    Note over Disk: No writes
+  end
+```
+
+A dry-run does not record a new decision and does not replace Apply.
 
 ## Out of scope for these use cases
 

@@ -2,7 +2,7 @@
 
 hdsort is a local program that scans a folder, finds duplicate files, asks the user before deleting anything, and records the files they kept. Later scans compare new folders with that record.
 
-The program is not implemented yet. This document is the architecture the prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
+The skeleton exists: the module, the package tree, and a version command. Product behavior is what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
 
 ## System context
 
@@ -172,11 +172,14 @@ Similarity is a second Strategy, invoked after exact grouping. Its output is a s
 stateDiagram-v2
   [*] --> open: scan finishes
   open --> open: user confirms a delete, keep, skip, or move
+  open --> open: dry run reports the plan and writes nothing
   open --> applied: trash succeeded and survivors were upserted
   open --> open: trash failed and the library was left unchanged
 ```
 
 Apply order is fixed (ADR-0004): validate the plan, trash the confirmed deletes, then upsert survivors at their post-move paths. A failed trash call leaves the library as it was.
+
+Dry-run (ADR-0009) runs that same validation and returns the operations apply would perform: Trash paths, confirmed moves, and library upserts at the survivors’ final paths. It does not call Trash, does not rename files, and does not write the library. The session stays `open`. A rejected plan returns the same rejection apply would return.
 
 The default layout strategy adds no moves (ADR-0005). A confirmed move’s destination stays inside the scan root.
 
@@ -190,6 +193,7 @@ All routes require the capability token, in the cookie `hdsort_token` or in `Aut
 | `POST /scans` | Body is a folder path, or an empty body that triggers the folder-dialog port. Starts a scan and returns a session id. |
 | `GET /scans/{id}` | Session: groups, recommendations, decisions, skips, layout proposals. |
 | `POST /scans/{id}/decisions` | Records keep, delete, or skip for one file id, or confirms one layout move. |
+| `POST /scans/{id}/dry-run` | UC-7. Returns the plan report and writes nothing. A form POST returns the review page with the report and the sentence “Nothing was changed.” `Accept: application/json` returns the same report as JSON with `changed: false`. Validation failure is the same rejection as apply. |
 | `POST /scans/{id}/apply` | Runs apply. Returns the unapplied session with the error if Trash or validation fails. |
 | `GET /scans/{id}/files/{fileID}/preview` | Bytes of a file that belongs to that session. |
 
