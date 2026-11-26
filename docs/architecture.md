@@ -2,7 +2,7 @@
 
 hdsort is a local program that scans a folder, finds duplicate files, asks the user before deleting anything, and records the files they kept. Later scans compare new folders with that record.
 
-The skeleton, the domain model, and content identity exist. Review and apply are what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
+The skeleton, the domain model, content identity, and the keeper policy exist. Review and apply are what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
 
 ## System context
 

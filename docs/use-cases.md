@@ -72,7 +72,7 @@ The recommendation the owner sees follows the rank in `docs/architecture.md`:
 
 - A library survivor outside the folder is the keeper. The in-folder copies are the delete suggestion. The library file is not given a new path.
 - Among copies that are all inside the folder, a name that is not a generated copy outranks `name (1)`, `Copy of name`, and a Dropbox `conflicted copy` name.
-- When those signals tie, the newer modification time wins, and the reason code is `newer_mtime_tiebreak`.
+- When those signals tie, the newer modification time wins, and the reason code is `newer_mtime_tiebreak`. The reason text says that the time was only a tie-break.
 - When the modification times also tie, there is no recommendation.
 
 `report_v1.pdf` and `report_final.pdf` with different bytes do not form a group. With identical bytes they do, and the version words still do not pick the keeper.

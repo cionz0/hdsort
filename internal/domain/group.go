@@ -15,10 +15,13 @@ const (
 
 // Recommendation is a delete suggestion for an exact group: the keeper path,
 // the paths suggested for Trash, and one reason code.
+// Text is the human-readable reason. For newer_mtime_tiebreak it says the
+// time was only a tie-break. An absent recommendation has no text and no code.
 type Recommendation struct {
 	Keeper string
 	Trash  []string
 	Reason ReasonCode
+	Text   string
 }
 
 // NewRecommendation builds a recommendation. The reason must be one of the
