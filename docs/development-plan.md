@@ -8,7 +8,7 @@ Status below is the source of truth for “what is next.” The session that fin
 | --- | --- | --- | --- |
 | 1 | [prompts/01-skeleton.md](../prompts/01-skeleton.md) | done (`cmd/hdsort`) | Go module, package layout, version command, test workflow |
 | 2 | [prompts/02-domain-model.md](../prompts/02-domain-model.md) | done (`internal/domain`) | Groups, recommendations, plan checks |
-| 3 | [prompts/03-identify-and-group.md](../prompts/03-identify-and-group.md) | not started | Walk, staged BLAKE3, exact groups |
+| 3 | [prompts/03-identify-and-group.md](../prompts/03-identify-and-group.md) | done (`internal/app`) | Walk, staged BLAKE3, exact groups |
 | 4 | [prompts/04-keeper-policy.md](../prompts/04-keeper-policy.md) | not started | Explainable keeper ranking |
 | 5 | [prompts/05-library-and-match.md](../prompts/05-library-and-match.md) | not started | SQLite library, reconcile, match |
 | 6 | [prompts/06-plan-apply-layout.md](../prompts/06-plan-apply-layout.md) | not started | Decisions, Trash, index commit, dry-run report, default layout |

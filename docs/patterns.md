@@ -48,7 +48,7 @@ These are language practices from the Go project, not additional architecture.
 | Application Support on macOS | Apple, “The Library Directory Stores App-Specific Files,” File System Programming Guide. <https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html> | `~/Library/Application Support/hdsort`. |
 | Roaming AppData on Windows | Microsoft, `FOLDERID_RoamingAppData`. <https://learn.microsoft.com/en-us/windows/win32/shell/knownfolderid> | `%AppData%\hdsort`. |
 | Trash on Linux | Freedesktop, “Trash specification.” <https://specifications.freedesktop.org/trash-spec/latest/> | The Trash adapter. Files are moved to Trash, not unlinked. |
-| BLAKE3 as the content identity | Jack O’Connor, Jean-Philippe Aumasson, Samuel Neves, Zooko Wilcox-O’Hearn, “BLAKE3,” 2020. <https://github.com/BLAKE3-team/BLAKE3-specs/blob/master/blake3.pdf> | The content ID is the BLAKE3 digest of the full file. The implementation is a module that states it implements that spec; the module path is recorded when prompt 03 adds it. The hash is not reimplemented in this repo. |
+| BLAKE3 as the content identity | Jack O’Connor, Jean-Philippe Aumasson, Samuel Neves, Zooko Wilcox-O’Hearn, “BLAKE3,” 2020. <https://github.com/BLAKE3-team/BLAKE3-specs/blob/master/blake3.pdf> | The content ID is the BLAKE3 digest of the full file. The hasher imports `lukechampine.com/blake3`, whose package states that it implements the BLAKE3 hash function (ADR-0007). The hash is not reimplemented in this repo. |
 
 ## Explicitly not adopted
 

@@ -2,7 +2,7 @@
 
 hdsort is a local program that scans a folder, finds duplicate files, asks the user before deleting anything, and records the files they kept. Later scans compare new folders with that record.
 
-The skeleton and the domain model exist: the module, the package tree, a version command, and the plan checks in `internal/domain`. Scanning, review, and apply are what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
+The skeleton, the domain model, and content identity exist. Review and apply are what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
 
 ## System context
 
@@ -101,20 +101,31 @@ Port interfaces stay small and live next to the use case that calls them (Go Cod
 The hasher is a Pipes and Filters pipeline (ADR-0007).
 
 ```mermaid
-flowchart LR
+flowchart TD
   files[Files in the scan root]
-  size[Filter: same size]
-  partial[Filter: BLAKE3 of head and tail]
+  small{Under 128 KiB?}
+  size{Shares a size with another file?}
+  partial[Filter: BLAKE3 of the first and last 64 KiB]
+  collide{Shares that partial hash?}
   full[Filter: BLAKE3 of all bytes]
   id[Content ID]
-  files --> size --> partial --> full --> id
+  stop[Not fully read]
+  files --> small
+  small -->|yes| full
+  small -->|no| size
+  size -->|no| stop
+  size -->|yes| partial
+  partial --> collide
+  collide -->|yes| full
+  collide -->|no| stop
+  full --> id
 ```
 
-The partial filter covers the first 64 KiB and the last 64 KiB, and only when the file is at least 128 KiB. Smaller files go straight to the full hash. The content ID is only the full digest.
+The partial filter covers the first 64 KiB and the last 64 KiB, and only when the file is at least 128 KiB. Smaller files go straight to the full hash. A large file that is alone in its size bucket, or whose partial hash matches no other file in that bucket, is not fully read and has no content ID. The content ID is only the full digest, computed by `lukechampine.com/blake3` (ADR-0007).
 
 Walk rules, applied before hashing:
 
-- Do not follow symlinks.
+- Do not follow symlinks. Report each one on the session as skipped, with reason `symlink` and the link destination, so the owner can see that the path was not compared.
 - Skip directories named `.git` or `node_modules`.
 - Skip the operating system Trash and the hdsort data directory (ADR-0008).
 - Skip dataless or unhydrated cloud placeholders. Report them on the session as skipped. Do not download them in order to hash them.
@@ -211,7 +222,6 @@ The SQLite file lives in the OS application-data directory (ADR-0008). Tests pas
 
 ## What this document does not decide
 
-- Which BLAKE3 module to import. Prompt 03 records it on ADR-0007.
 - Which perceptual hash or text similarity function to use. Prompt 07 writes that ADR first.
 - Code signing and notarization for macOS releases.
 - A command that gathers library entries into a single folder.

@@ -138,6 +138,36 @@ func (SimilarGroup) SetRecommendation(Recommendation) error {
 	return ErrSimilarRecommendation
 }
 
+// GroupExact returns one exact group for each content ID shared by two or
+// more readable files, in the order those IDs first appear. A content ID
+// that appears once is omitted. An empty content ID is not a group.
+func GroupExact(files []FileRef) ([]ExactGroup, error) {
+	var order []ContentID
+	buckets := make(map[ContentID][]FileRef)
+	for _, file := range files {
+		if !file.Readable || file.ContentID == "" {
+			continue
+		}
+		if _, ok := buckets[file.ContentID]; !ok {
+			order = append(order, file.ContentID)
+		}
+		buckets[file.ContentID] = append(buckets[file.ContentID], file)
+	}
+	var groups []ExactGroup
+	for _, id := range order {
+		members := buckets[id]
+		if len(members) < 2 {
+			continue
+		}
+		group, err := NewExactGroup(members)
+		if err != nil {
+			return nil, err
+		}
+		groups = append(groups, group)
+	}
+	return groups, nil
+}
+
 func cloneFiles(in []FileRef) []FileRef {
 	out := make([]FileRef, len(in))
 	copy(out, in)

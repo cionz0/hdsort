@@ -27,9 +27,9 @@ flowchart LR
 
 ## UC-1 Scan a folder
 
-The owner points hdsort at a folder. hdsort inventories the readable files, assigns content IDs, and opens a session.
+The owner points hdsort at a folder. hdsort inventories the readable files, assigns content IDs, groups the files that share an ID, and opens a session. A content ID that appears once is not a group.
 
-The walk does not follow symlinks, does not hash dataless placeholders, and skips `.git`, `node_modules`, Trash, and the hdsort data directory. Skipped placeholders are listed on the session so the owner can see that those paths were not compared.
+The walk does not follow symlinks, does not hash dataless placeholders, and skips `.git`, `node_modules`, Trash, and the hdsort data directory. Each symlink is listed on the session with the reason symlink and its destination. Dataless placeholders are listed too, so the owner can see that those paths were not compared.
 
 ```mermaid
 sequenceDiagram
@@ -41,10 +41,11 @@ sequenceDiagram
   Owner->>Page: Choose folder
   Page->>Scan: Start scan
   Scan->>Disk: Walk the root
-  Disk-->>Scan: Readable files and skipped placeholders
+  Disk-->>Scan: Readable files, symlinks, and skipped placeholders
   Scan->>Hash: Content ID for each readable file
   Hash-->>Scan: Content IDs
-  Scan-->>Page: Open session
+  Note over Scan: Two or more files with one content ID form an exact group
+  Scan-->>Page: Open session with exact groups and skipped paths
 ```
 
 Two readable files with the same bytes produce the same content ID, including two empty files. Two files that share a size and share the first and last 64 KiB but differ in the middle produce different content IDs.

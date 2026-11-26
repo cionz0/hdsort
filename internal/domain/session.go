@@ -10,14 +10,32 @@ const (
 	StatusApplied SessionStatus = "applied"
 )
 
-// Session is one scan: root, groups, decisions, layout moves, and status.
-// Status starts at open. ApplyResult is the only transition, from open to applied.
+// SkipReason says why a path was listed on the session and not hashed.
+type SkipReason string
+
+const (
+	SkipDataless SkipReason = "dataless"
+	SkipSymlink  SkipReason = "symlink"
+)
+
+// Skipped is a path the scan did not hash.
+// Target is the symlink destination when Reason is symlink, and empty otherwise.
+type Skipped struct {
+	Path   string
+	Reason SkipReason
+	Target string
+}
+
+// Session is one scan: root, groups, decisions, layout moves, skipped paths,
+// and status. Status starts at open. ApplyResult is the only transition,
+// from open to applied.
 type Session struct {
 	Root      string
 	Exact     []ExactGroup
 	Similar   []SimilarGroup
 	Decisions []Decision
 	Moves     []LayoutMove
+	Skipped   []Skipped
 
 	status SessionStatus
 }

@@ -27,4 +27,5 @@ The Go module that implements BLAKE3 is chosen in prompt 03, must state that it 
 
 - Two files with the same size and the same head and tail but a different middle produce two content IDs. That case is an acceptance test.
 - A cloud placeholder or other dataless file is not hashed. The walk reports it as skipped.
-- Symlinks are not followed.
+- Symlinks are not followed. Each symlink is listed on the session as skipped, with reason `symlink` and the link destination.
+- The hasher imports `lukechampine.com/blake3` v1.5.3. Its package comment states: "Package blake3 implements the BLAKE3 cryptographic hash function." The module README links that claim to the BLAKE3 specification repository, <https://github.com/BLAKE3-team/BLAKE3>. This repository calls that module and does not reimplement the compression function.
