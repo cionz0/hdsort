@@ -4,7 +4,7 @@ hdsort scans a folder on your machine, finds duplicate files, and asks you befor
 
 The review UI is a page served by the program on `127.0.0.1`. From that page the owner can dry-run the current decisions and see what would change; a dry-run writes nothing. The files never leave the computer. Cloud copies are included only when a sync client has already stored them in a local folder.
 
-This repository is the specification and the build plan. Product behavior is still ahead: the module, package tree, and version command exist. Each file in [`prompts/`](prompts/) is one implementation session, in the order listed in [`docs/development-plan.md`](docs/development-plan.md).
+This repository is the specification and the build plan. The module, package tree, version command, and domain model exist. Scanning and the review page are still ahead. Each file in [`prompts/`](prompts/) is one implementation session, in the order listed in [`docs/development-plan.md`](docs/development-plan.md).
 
 ## Documentation
 
@@ -34,7 +34,7 @@ go build -o hdsort ./cmd/hdsort
 
 ## Status
 
-Prompt 01 is done. Next session: [`prompts/02-domain-model.md`](prompts/02-domain-model.md).
+Prompts 01 and 02 are done. Next session: [`prompts/03-identify-and-group.md`](prompts/03-identify-and-group.md).
 
 ## License
 

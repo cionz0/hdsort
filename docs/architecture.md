@@ -2,7 +2,7 @@
 
 hdsort is a local program that scans a folder, finds duplicate files, asks the user before deleting anything, and records the files they kept. Later scans compare new folders with that record.
 
-The skeleton exists: the module, the package tree, and a version command. Product behavior is what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
+The skeleton and the domain model exist: the module, the package tree, a version command, and the plan checks in `internal/domain`. Scanning, review, and apply are what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
 
 ## System context
 
@@ -133,12 +133,14 @@ Generated-copy rules, matched against the base name:
 - a `Copy of ` prefix
 - the phrase `conflicted copy` anywhere in the base name
 
-If those three signals still tie, the recommendation is absent. The user chooses. Version-looking words are not a signal.
+If those three signals still tie, the recommendation is absent. The user chooses. Absence is a missing value, not a recommendation whose reason code is empty. Version-looking words are not a signal.
 
 A plan check in the domain rejects apply when:
 
 - any trashed path has no delete decision, or
 - the plan would remove every copy of a content ID that is not already in the library.
+
+A library entry counts only when it has a content ID and a path, and that path is not itself in the trash list. Trashing the library path as well as every in-scan copy is still last-copy loss.
 
 When the library entry’s path is outside the scan root, the recommendation keeps that library path and suggests trashing the in-scan copies. The library file is not moved. When the library path is inside the scan and the bytes still match, that path is the keeper inside the one exact group.
 
