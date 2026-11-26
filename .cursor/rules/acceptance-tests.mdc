@@ -12,6 +12,7 @@ Every behavior change ships with a test that states the accepted behavior. A cha
 - Test use cases through their public inputs and outputs. Drive adapters with a temporary directory or a temporary SQLite file, not a fake of the thing under test.
 - A port fake is allowed only at the boundary the use case does not own (OS folder dialog, OS trash UI).
 - When a prompt lists acceptance tests, those tests are the definition of done. Add the missing case before declaring the prompt finished.
+- The prompt is finished only when those tests and the tests from earlier prompts pass. Run `go test ./...`.
 - Update the doc that describes the behavior in the same change as the test.
 
 ```go

@@ -1,6 +1,6 @@
 # Development plan
 
-Each file in `prompts/` is one implementation session. Run them in order. A session implements the prompt it was given and stops when that prompt’s acceptance tests pass.
+Each file in `prompts/` is one implementation session. Run them in order. A session implements the prompt it was given. The prompt is finished when its acceptance tests and the tests from earlier prompts pass (`go test ./...`).
 
 Status below is the source of truth for “what is next.” The session that finishes a prompt sets that row to `done` and names the test package it added.
 
@@ -21,10 +21,10 @@ Status below is the source of truth for “what is next.” The session that fin
 
 1. Read `README.md`, `docs/architecture.md`, `docs/use-cases.md`, `docs/patterns.md`, and the ADRs the prompt names.
 2. Implement only that prompt.
-3. Keep the acceptance tests from the prompt. They are the definition of done (ADR-0006).
+3. Keep the acceptance tests from the prompt. They are part of the definition of done (ADR-0006). Finish only when those tests and the earlier ones pass (`go test ./...`).
 4. Update the diagram and the prose if the behavior you implemented changed a document.
 5. Set this table’s status for that prompt to `done`.
-6. Stop. Do not start the next prompt in the same session.
+6. If the prompt closed with no errors, warnings, open questions, or leftover work, commit, push, and update MemPalace when the chat decided something the repository does not record. Then stop. Do not start the next prompt in the same session.
 
 ## Current product boundary
 

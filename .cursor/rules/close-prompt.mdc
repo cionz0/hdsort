@@ -1,0 +1,21 @@
+---
+description: Commit and push a prompt that closes cleanly, and update MemPalace when the chat decided something the repo does not record
+alwaysApply: true
+---
+
+# Close a prompt
+
+When a prompt finishes with no errors, no warnings, no open questions, and no leftover work:
+
+1. Commit the prompt's changes.
+2. Push that commit.
+3. Update MemPalace only when the session decided something that is not already in the repository. Follow the MemPalace wing rules.
+
+Do not commit when a test fails, `go vet` reports a problem, a document and its diagram disagree, or a question for the user is still open.
+
+Do not start the next prompt in the same session.
+
+```text
+Bad: this prompt's tests pass, an older test fails, commit anyway
+Good: go test ./... and go vet ./... are clean, commit, push, stop
+```
