@@ -1,0 +1,23 @@
+---
+description: Use only design and architecture patterns cited in the catalog
+alwaysApply: true
+---
+
+# Cited patterns only
+
+`docs/patterns.md` is the closed catalog of design patterns, architectural styles, and practices this project may use. Each entry cites its source.
+
+Do not coin a pattern name. Do not add a pattern, library convention, or "best practice" that the catalog does not already cite.
+
+To introduce one:
+
+1. Add the citation (author, title, year, and URL when one exists) to `docs/patterns.md`.
+2. Record why this codebase needs it in a new ADR under `docs/adr/`.
+3. Name the packages it applies to.
+
+`docs/architecture.md` must stay consistent with the catalog. If a prompt and the catalog disagree, stop and update the ADR first.
+
+```text
+Bad:  type SmartFolderBrain struct{} // unnamed, uncited
+Good: type LibraryRepository interface{} // Repository, Evans 2003; see docs/patterns.md
+```

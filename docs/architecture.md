@@ -1,0 +1,211 @@
+# Architecture
+
+hdsort is a local program that scans a folder, finds duplicate files, asks the user before deleting anything, and records the files they kept. Later scans compare new folders with that record.
+
+The program is not implemented yet. This document is the architecture the prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
+
+## System context
+
+One person uses hdsort on the computer where the files already are. Cloud copies participate only when a sync client has placed them on a local path. hdsort does not call a cloud provider API.
+
+```mermaid
+flowchart LR
+  owner[Person: file owner]
+  hdsort[hdsort]
+  disk[Local and synced folders]
+  trash[Operating system Trash]
+  owner -->|chooses a folder and confirms each delete or move| hdsort
+  hdsort -->|reads metadata and bytes| disk
+  hdsort -->|moves confirmed duplicates| trash
+```
+
+## Containers
+
+The browser is the window. The Go process is the application. SQLite is the memory of survivors and of in-progress sessions.
+
+```mermaid
+flowchart LR
+  browser[Browser]
+  process[hdsort process]
+  sqlite[(SQLite library and sessions)]
+  disk[Filesystem]
+  trash[OS Trash]
+  browser -->|loopback HTTP only| process
+  process --> sqlite
+  process --> disk
+  process --> trash
+```
+
+The process binds `127.0.0.1` or `::1` (ADR-0002). It opens the capability URL in the system browser. Release builds are one `CGO_ENABLED=0` binary per OS/architecture.
+
+## Components
+
+Ports and Adapters: the use cases sit in the middle, the browser drives them, and filesystem, hasher, SQLite, and Trash are driven adapters. The Dependency Rule puts `internal/domain` at the center. `cmd/hdsort` is the only composition root.
+
+```mermaid
+flowchart TB
+  subgraph driving [Driving adapter]
+    http[HTTP adapter]
+  end
+  subgraph core [Application core]
+    app[Use cases in internal/app]
+    domain[Policies in internal/domain]
+  end
+  subgraph driven [Driven adapters]
+    walk[Filesystem walk]
+    hasher[Staged BLAKE3 hasher]
+    repo[SQLite repositories]
+    trasher[Trash adapter]
+    picker[Folder dialog]
+  end
+  http --> app
+  app --> domain
+  walk -.->|implements a port declared in app| app
+  hasher -.->|implements a port declared in app| app
+  repo -.->|implements a port declared in app| app
+  trasher -.->|implements a port declared in app| app
+  picker -.->|implements a port declared in app| app
+```
+
+Compile-time dependencies point inward. Adapters import `internal/app` so they can implement the port interfaces the use cases declared. `internal/app` does not import an adapter. `internal/domain` imports only the standard library.
+
+| Path | Role |
+| --- | --- |
+| `cmd/hdsort` | Composition root. Builds adapters, calls `ListenAndServe` on loopback, opens the browser. |
+| `internal/domain` | Content ID, groups, keeper ranking, plan checks, layout strategy results. Pure functions. |
+| `internal/app` | Use cases: scan, reconcile, decide, apply, propose layout. Declares the port interfaces it calls. |
+| `internal/adapters/filesystem` | Walk, skip rules, native folder dialog. |
+| `internal/adapters/hash` | Size, partial BLAKE3, full BLAKE3. |
+| `internal/adapters/sqlite` | `LibraryRepository` and `SessionRepository`. WAL mode. |
+| `internal/adapters/trash` | Freedesktop Trash layout; macOS and Windows behind build tags. |
+| `internal/adapters/http` | Routes, cookie, review page. |
+
+Port interfaces stay small and live next to the use case that calls them (Go Code Review Comments: the consumer owns the interface).
+
+## Vocabulary
+
+| Term | Meaning |
+| --- | --- |
+| Content ID | BLAKE3 of the full file bytes. Empty files have a content ID. |
+| File ref | Path, size, modification time, content ID, and whether the file was readable. |
+| Exact group | Two or more file refs with the same content ID. |
+| Similar group | Two or more file refs that a cited similarity strategy matched and whose content IDs differ. No delete recommendation. |
+| Library entry | A survivor: content ID, current path, time it was indexed. |
+| Recommendation | Optional. Keeper path, paths suggested for Trash, and one reason code. |
+| Decision | The user’s confirmation for one path: keep, delete, or skip. |
+| Layout move | A proposed rename or relocation inside the scan root. Inactive until confirmed. |
+| Session | One scan: root, exact groups, similar groups, decisions, moves, status (`open`, `applied`). |
+
+## Content identity
+
+The hasher is a Pipes and Filters pipeline (ADR-0007).
+
+```mermaid
+flowchart LR
+  files[Files in the scan root]
+  size[Filter: same size]
+  partial[Filter: BLAKE3 of head and tail]
+  full[Filter: BLAKE3 of all bytes]
+  id[Content ID]
+  files --> size --> partial --> full --> id
+```
+
+The partial filter covers the first 64 KiB and the last 64 KiB, and only when the file is at least 128 KiB. Smaller files go straight to the full hash. The content ID is only the full digest.
+
+Walk rules, applied before hashing:
+
+- Do not follow symlinks.
+- Skip directories named `.git` or `node_modules`.
+- Skip the operating system Trash and the hdsort data directory (ADR-0008).
+- Skip dataless or unhydrated cloud placeholders. Report them on the session as skipped. Do not download them in order to hash them.
+
+## Keeper policy
+
+The keeper policy is a Strategy. The default strategy ranks file refs that already share a content ID. Higher rank is the suggested keeper.
+
+1. `library_survivor` — this path is the current library entry for that content ID.
+2. `plain_name` — the file name does not match a generated-copy rule. The other names do.
+3. `newer_mtime_tiebreak` — the ranks above were equal, and this file’s modification time is later. The reason text says the time was only a tie-break.
+
+Generated-copy rules, matched against the base name:
+
+- a space, an opening parenthesis, digits, and a closing parenthesis before the extension, such as `name (1).jpg`
+- a `Copy of ` prefix
+- the phrase `conflicted copy` anywhere in the base name
+
+If those three signals still tie, the recommendation is absent. The user chooses. Version-looking words are not a signal.
+
+A plan check in the domain rejects apply when:
+
+- any trashed path has no delete decision, or
+- the plan would remove every copy of a content ID that is not already in the library.
+
+When the library entry’s path is outside the scan root, the recommendation keeps that library path and suggests trashing the in-scan copies. The library file is not moved. When the library path is inside the scan and the bytes still match, that path is the keeper inside the one exact group.
+
+## Reconcile
+
+Before matching, the scan reconciles library entries whose stored path is inside the scan root.
+
+```mermaid
+flowchart TD
+  entry[Library entry whose path is inside the root]
+  exists{File still at that path?}
+  same{Content ID unchanged?}
+  refresh[Keep the entry and refresh metadata]
+  stale[Mark the entry stale]
+  entry --> exists
+  exists -->|no| stale
+  exists -->|yes| same
+  same -->|yes| refresh
+  same -->|no| stale
+```
+
+A stale entry is not a duplicate of the files found in this scan. Matching uses the entries that are still valid.
+
+## Similarity
+
+Similarity is a second Strategy, invoked after exact grouping. Its output is a similar group and nothing else. The algorithm and the threshold are not chosen in this document. Prompt 07 adds them by ADR, citing the paper or specification of the algorithm, before any code lands. Byte-identical files never appear in a similar group (ADR-0003).
+
+## Sessions and apply
+
+```mermaid
+stateDiagram-v2
+  [*] --> open: scan finishes
+  open --> open: user confirms a delete, keep, skip, or move
+  open --> applied: trash succeeded and survivors were upserted
+  open --> open: trash failed and the library was left unchanged
+```
+
+Apply order is fixed (ADR-0004): validate the plan, trash the confirmed deletes, then upsert survivors at their post-move paths. A failed trash call leaves the library as it was.
+
+The default layout strategy adds no moves (ADR-0005). A confirmed move’s destination stays inside the scan root.
+
+## HTTP surface
+
+All routes require the capability token, in the cookie `hdsort_token` or in `Authorization: Bearer`.
+
+| Method and path | Behavior |
+| --- | --- |
+| `GET /?token=` | Sets the cookie and returns the review page. |
+| `POST /scans` | Body is a folder path, or an empty body that triggers the folder-dialog port. Starts a scan and returns a session id. |
+| `GET /scans/{id}` | Session: groups, recommendations, decisions, skips, layout proposals. |
+| `POST /scans/{id}/decisions` | Records keep, delete, or skip for one file id, or confirms one layout move. |
+| `POST /scans/{id}/apply` | Runs apply. Returns the unapplied session with the error if Trash or validation fails. |
+| `GET /scans/{id}/files/{fileID}/preview` | Bytes of a file that belongs to that session. |
+
+A query or body that contains a filesystem path where a file id is required is a 400. An unknown file id is a 404. A missing token is a 401.
+
+## Synced-folder hint
+
+The review page shows a banner when a path segment of the scan root is one of: `CloudStorage`, `Mobile Documents`, `Dropbox`, `Google Drive`. The banner says that deleting the local file can delete the synced copy, and that the check is only a path-segment hint.
+
+## Library file
+
+The SQLite file lives in the OS application-data directory (ADR-0008). Tests pass a temporary path and never open the real library.
+
+## What this document does not decide
+
+- Which BLAKE3 module to import. Prompt 03 records it on ADR-0007.
+- Which perceptual hash or text similarity function to use. Prompt 07 writes that ADR first.
+- Code signing and notarization for macOS releases.
+- A command that gathers library entries into a single folder.

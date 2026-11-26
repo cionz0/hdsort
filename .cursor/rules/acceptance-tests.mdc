@@ -1,0 +1,24 @@
+---
+description: Tests are the acceptance specification for every change
+alwaysApply: true
+---
+
+# Tests are acceptance
+
+Every behavior change ships with a test that states the accepted behavior. A change without that test is not done.
+
+- Name acceptance tests `TestAcceptance_<Behavior>`.
+- Put the cases in a table when the behavior is a list of situations (Go wiki: TableDrivenTests).
+- Test use cases through their public inputs and outputs. Drive adapters with a temporary directory or a temporary SQLite file, not a fake of the thing under test.
+- A port fake is allowed only at the boundary the use case does not own (OS folder dialog, OS trash UI).
+- When a prompt lists acceptance tests, those tests are the definition of done. Add the missing case before declaring the prompt finished.
+- Update the doc that describes the behavior in the same change as the test.
+
+```go
+func TestAcceptance_ExactGroupRecommendsPlainName(t *testing.T) {
+    got := Recommend(group)
+    if got.Keeper != "a.jpg" {
+        t.Fatalf("keeper = %s", got.Keeper)
+    }
+}
+```

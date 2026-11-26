@@ -1,0 +1,22 @@
+---
+description: Architecture, feature, and use-case docs include Mermaid diagrams
+alwaysApply: true
+---
+
+# Diagrams in docs
+
+Architecture, feature, and use-case documents include both prose and a diagram. A behavior change updates both in the same change.
+
+- Render diagrams as Mermaid fences so GitHub can display them.
+- Use the C4 levels already named in `docs/architecture.md` for structure, and a sequence diagram for a use case.
+- Keep the diagram specific to this system: real component names, real use-case names.
+- If the prose and the diagram disagree, fix both before finishing.
+
+````markdown
+```mermaid
+sequenceDiagram
+  actor User
+  participant Scan
+  User->>Scan: Start scan
+```
+````

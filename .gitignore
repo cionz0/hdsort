@@ -1,0 +1,17 @@
+.DS_Store
+
+# Go build output
+/bin/
+/dist/
+*.exe
+*.test
+coverage.out
+
+# Local MemPalace config (the wing name lives in .mempalace-wing)
+mempalace.yaml
+mempalace.yml
+
+# Local environments and editor state
+.venv/
+venv/
+.idea/

@@ -1,0 +1,15 @@
+---
+description: Project documentation and UI copy are written in English
+alwaysApply: true
+---
+
+# English artifacts
+
+Write repository artifacts in English: README, docs, ADRs, prompts, code comments, commit messages, and UI strings.
+
+Chat with the user can stay in the language they used. The artifact you then add to the repo is English.
+
+```text
+Bad:  // raggruppa i file uguali
+Good: // Group files that share a content ID.
+```
