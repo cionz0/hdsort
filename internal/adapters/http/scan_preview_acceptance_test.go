@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,7 +31,7 @@ func TestAcceptance_PostScanCreatesSession(t *testing.T) {
 	writeBytes(t, filepath.Join(root, "b.png"), body)
 
 	server := scanServer(t, root)
-	got := postScan(t, server, `{"path":"`+root+`"}`)
+	got := postScan(t, server, scanPayload(t, root, false))
 	if got.ID == "" {
 		t.Fatal("missing session id")
 	}
@@ -52,7 +53,7 @@ func TestAcceptance_PostScanExactOnlyOmitsSimilar(t *testing.T) {
 		t.Fatalf("start control missing exact-only choice\n%s", home.Body.String())
 	}
 
-	limited := postScan(t, server, `{"path":"`+root+`","exactOnly":true}`)
+	limited := postScan(t, server, scanPayload(t, root, true))
 	if !limited.ExactOnly {
 		t.Fatal("response exactOnly = false")
 	}
@@ -63,7 +64,7 @@ func TestAcceptance_PostScanExactOnlyOmitsSimilar(t *testing.T) {
 		t.Fatalf("exact groups = %d, want 0", len(limited.Exact))
 	}
 
-	full := postScan(t, server, `{"path":"`+root+`"}`)
+	full := postScan(t, server, scanPayload(t, root, false))
 	if full.ExactOnly {
 		t.Fatal("omitted exactOnly was stored as true")
 	}
@@ -95,7 +96,7 @@ func TestAcceptance_PreviewByIDReturnsBytes(t *testing.T) {
 	writeBytes(t, path, body)
 
 	server := scanServer(t, root)
-	got := postScan(t, server, `{"path":"`+root+`"}`)
+	got := postScan(t, server, scanPayload(t, root, false))
 	id := fileID(t, got, path)
 	rec := getBearer(t, server, "/scans/"+got.ID+"/files/"+id+"/preview")
 	if rec.Code != http.StatusOK {
@@ -112,10 +113,10 @@ func TestAcceptance_PreviewRejectsRawPath(t *testing.T) {
 	path := filepath.Join(root, "small.png")
 	writeBytes(t, path, body)
 	server := scanServer(t, root)
-	got := postScan(t, server, `{"path":"`+root+`"}`)
+	got := postScan(t, server, scanPayload(t, root, false))
 	id := fileID(t, got, path)
 
-	query := getBearer(t, server, "/scans/"+got.ID+"/files/"+id+"/preview?path="+path)
+	query := getBearer(t, server, "/scans/"+got.ID+"/files/"+id+"/preview?path="+url.QueryEscape(path))
 	if query.Code != http.StatusBadRequest {
 		t.Fatalf("query status = %d, want 400", query.Code)
 	}
@@ -123,7 +124,7 @@ func TestAcceptance_PreviewRejectsRawPath(t *testing.T) {
 		t.Fatal("query path returned the file")
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/scans/"+got.ID+"/files/"+id+"/preview", strings.NewReader(`{"path":"`+path+`"}`))
+	req := httptest.NewRequest(http.MethodGet, "/scans/"+got.ID+"/files/"+id+"/preview", strings.NewReader(scanPayload(t, path, false)))
 	req.Header.Set("Authorization", "Bearer "+testToken)
 	req.Header.Set("Content-Type", "application/json")
 	bodyRec := httptest.NewRecorder()
@@ -145,8 +146,8 @@ func TestAcceptance_PreviewUnknownIDIs404(t *testing.T) {
 	writeBytes(t, filepath.Join(secondRoot, "b.png"), body)
 
 	server := scanServer(t, firstRoot)
-	first := postScan(t, server, `{"path":"`+firstRoot+`"}`)
-	second := postScan(t, server, `{"path":"`+secondRoot+`"}`)
+	first := postScan(t, server, scanPayload(t, firstRoot, false))
+	second := postScan(t, server, scanPayload(t, secondRoot, false))
 	id := fileID(t, first, firstPath)
 
 	missing := getBearer(t, server, "/scans/"+second.ID+"/files/"+id+"/preview")
@@ -172,7 +173,7 @@ func TestAcceptance_LargeImageIsThumbnail(t *testing.T) {
 	}
 
 	server := scanServer(t, root)
-	got := postScan(t, server, `{"path":"`+root+`"}`)
+	got := postScan(t, server, scanPayload(t, root, false))
 	rec := getBearer(t, server, "/scans/"+got.ID+"/files/"+fileID(t, got, path)+"/preview")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body %s", rec.Code, rec.Body.String())
@@ -218,6 +219,19 @@ func scanServer(t *testing.T, pick string) *httpadapter.Server {
 	store := openStore(t)
 	return httpadapter.New(testToken, store, store, trash.NewFreedesktop(t.TempDir()), filesystem.NewOpener()).
 		WithScan(filesystem.NewWalker(nil), filesystem.NewOpener(), hash.New(), similar.New(), pathPicker{path: pick})
+}
+
+func scanPayload(t *testing.T, path string, exactOnly bool) string {
+	t.Helper()
+	body := struct {
+		Path      string `json:"path,omitempty"`
+		ExactOnly bool   `json:"exactOnly,omitempty"`
+	}{Path: path, ExactOnly: exactOnly}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
 }
 
 func postScan(t *testing.T, server *httpadapter.Server, payload string) scanJSON {
