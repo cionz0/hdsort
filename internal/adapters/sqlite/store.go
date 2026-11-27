@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS library (
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
   root TEXT NOT NULL,
-  status TEXT NOT NULL
+  status TEXT NOT NULL,
+  exact_only INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS exact_members (
@@ -158,7 +159,10 @@ func (s *Store) configure() error {
 	if _, err := s.db.Exec(schema); err != nil {
 		return err
 	}
-	return ensureMoveConfirmed(s.db)
+	if err := ensureMoveConfirmed(s.db); err != nil {
+		return err
+	}
+	return ensureExactOnly(s.db)
 }
 
 // ensureMoveConfirmed adds the confirmation column on a library created
@@ -172,6 +176,21 @@ func ensureMoveConfirmed(db *sql.DB) error {
 		return nil
 	}
 	_, err := db.Exec(`ALTER TABLE moves ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0`)
+	return err
+}
+
+// ensureExactOnly adds the scan-mode column on a library created before
+// sessions recorded whether similarity was skipped (ADR-0011).
+// The default 0 means similar files are included.
+func ensureExactOnly(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('sessions') WHERE name = 'exact_only'`).Scan(&n); err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil
+	}
+	_, err := db.Exec(`ALTER TABLE sessions ADD COLUMN exact_only INTEGER NOT NULL DEFAULT 0`)
 	return err
 }
 

@@ -25,8 +25,8 @@ func (s *Store) Save(session domain.Session) (string, error) {
 	defer tx.Rollback()
 
 	if _, err := tx.Exec(
-		`INSERT INTO sessions (id, root, status) VALUES (?, ?, ?)`,
-		id, session.Root, string(session.Status()),
+		`INSERT INTO sessions (id, root, status, exact_only) VALUES (?, ?, ?, ?)`,
+		id, session.Root, string(session.Status()), boolInt(session.ExactOnly),
 	); err != nil {
 		return "", err
 	}
@@ -62,8 +62,8 @@ func (s *Store) Replace(id string, session domain.Session) error {
 		}
 	}
 	if _, err := tx.Exec(
-		`UPDATE sessions SET root = ?, status = ? WHERE id = ?`,
-		session.Root, string(session.Status()), id,
+		`UPDATE sessions SET root = ?, status = ?, exact_only = ? WHERE id = ?`,
+		session.Root, string(session.Status()), boolInt(session.ExactOnly), id,
 	); err != nil {
 		return err
 	}
@@ -76,7 +76,8 @@ func (s *Store) Replace(id string, session domain.Session) error {
 // Load rebuilds a session saved by Save.
 func (s *Store) Load(id string) (domain.Session, error) {
 	var root, status string
-	err := s.db.QueryRow(`SELECT root, status FROM sessions WHERE id = ?`, id).Scan(&root, &status)
+	var exactOnly int
+	err := s.db.QueryRow(`SELECT root, status, exact_only FROM sessions WHERE id = ?`, id).Scan(&root, &status, &exactOnly)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Session{}, fmt.Errorf("sqlite: session %s: %w", id, app.ErrSessionNotFound)
 	}
@@ -84,6 +85,7 @@ func (s *Store) Load(id string) (domain.Session, error) {
 		return domain.Session{}, err
 	}
 	session := domain.NewSession(root)
+	session.ExactOnly = exactOnly != 0
 	session.Exact, err = loadExact(s.db, id)
 	if err != nil {
 		return domain.Session{}, err

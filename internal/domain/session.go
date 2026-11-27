@@ -32,6 +32,8 @@ type Skipped struct {
 // Session is one scan: root, groups, decisions, layout moves, skipped paths,
 // and status. Status starts at open. ApplyResult moves an open session to
 // applied. RestoreSession reloads a status that was already stored.
+// ExactOnly reports a scan that did not call the similarity strategy.
+// The zero value includes similar files (ADR-0011).
 type Session struct {
 	Root      string
 	Exact     []ExactGroup
@@ -39,6 +41,7 @@ type Session struct {
 	Decisions []Decision
 	Moves     []LayoutMove
 	Skipped   []Skipped
+	ExactOnly bool
 
 	status SessionStatus
 }

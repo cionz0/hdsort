@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"io"
 	"time"
 
@@ -57,12 +58,13 @@ type Result struct {
 	Files   []domain.FileRef
 }
 
-// Scan walks root, hashes the readable files, groups exact duplicates, and
-// then asks the similarity strategy for groups that are close but not
-// byte-identical. Dataless files and symlinks are listed on the session and
-// are not hashed. A symlink keeps its destination so the owner can see what
-// the link is.
-func Scan(root, dataDir string, walk Walker, files FileReader, id Identifier, sim Similarizer) (Result, error) {
+// Scan walks root, hashes the readable files, and groups exact duplicates.
+// exactOnly is the ADR-0011 mode. The zero value runs the similarity strategy
+// after exact grouping. True skips that call and leaves similar groups empty.
+// sim is required either way: a nil strategy is not the exact-only switch.
+// Dataless files and symlinks are listed on the session and are not hashed.
+// A symlink keeps its destination so the owner can see what the link is.
+func Scan(root, dataDir string, walk Walker, files FileReader, id Identifier, sim Similarizer, exactOnly bool) (Result, error) {
 	entries, err := walk.Walk(root, dataDir)
 	if err != nil {
 		return Result{}, err
@@ -95,13 +97,20 @@ func Scan(root, dataDir string, walk Walker, files FileReader, id Identifier, si
 	if err != nil {
 		return Result{}, err
 	}
-	similar, err := sim.Similar(refs, files)
-	if err != nil {
-		return Result{}, err
+	if sim == nil {
+		return Result{}, fmt.Errorf("scan: similarity strategy is required")
+	}
+	var similar []domain.SimilarGroup
+	if !exactOnly {
+		similar, err = sim.Similar(refs, files)
+		if err != nil {
+			return Result{}, err
+		}
 	}
 	session := domain.NewSession(root)
 	session.Exact = groups
 	session.Similar = similar
 	session.Skipped = skipped
+	session.ExactOnly = exactOnly
 	return Result{Session: session, Files: refs}, nil
 }
