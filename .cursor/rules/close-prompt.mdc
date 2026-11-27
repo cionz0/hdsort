@@ -7,9 +7,10 @@ alwaysApply: true
 
 When a prompt finishes with no errors, no warnings, no open questions, and no leftover work:
 
-1. Commit the prompt's changes.
+1. Commit the prompt's changes. Commit any README changes in that commit, or in an earlier commit, before the push.
 2. Push that commit.
-3. Update MemPalace only when the session decided something that is not already in the repository. Follow the MemPalace wing rules.
+3. Tag that commit with the next SemVer version and push the tag. Follow `.cursor/rules/tag-on-push.mdc`.
+4. Update MemPalace only when the session decided something that is not already in the repository. Follow the MemPalace wing rules.
 
 Do not commit when a test fails, `go vet` reports a problem, a document and its diagram disagree, or a question for the user is still open.
 
@@ -17,5 +18,5 @@ Do not start the next prompt in the same session.
 
 ```text
 Bad: this prompt's tests pass, an older test fails, commit anyway
-Good: go test ./... and go vet ./... are clean, commit, push, stop
+Good: go test ./... and go vet ./... are clean, commit the README with the change, push, tag, stop
 ```

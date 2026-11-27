@@ -1,0 +1,25 @@
+---
+description: Every push publishes the next Semantic Version tag, after README changes are committed
+alwaysApply: true
+---
+
+# Tag every push
+
+A push that publishes project work also gets a new SemVer tag. The tag is what starts the release build.
+
+1. Commit README changes before the push. Do not push while README edits are still uncommitted.
+2. Push the branch.
+3. Tag the commit you just pushed with the next `vMAJOR.MINOR.PATCH`, then push that tag by itself.
+
+Choose the number from the tags already on the remote:
+
+- **MAJOR** when public behavior breaks.
+- **MINOR** when behavior is added and existing use still works.
+- **PATCH** for a fix, or for a documentation-only change.
+
+Keep the `v` prefix. Do not move or delete an existing tag. Do not tag when tests fail, `go vet` reports a problem, or the branch push did not happen.
+
+```text
+Bad: git push origin HEAD and leave the commit untagged
+Good: commit the README, push HEAD, then git push origin v0.3.0
+```

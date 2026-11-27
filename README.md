@@ -34,7 +34,7 @@ go build -o hdsort ./cmd/hdsort
 
 ## Install a release
 
-Release tags follow [Semantic Versioning 2.0.0](https://semver.org/): `vMAJOR.MINOR.PATCH`, with an optional pre-release suffix `-alpha.N`, `-beta.N`, or `-rc.N`. Pushing that tag is the only version step. GitHub Actions builds each archive with cgo on a runner of that operating system, writes the tag into the binary, and attaches the archives to the [GitHub Release](https://github.com/cionz0/hdsort/releases). A local checkout does not change `v0.0.0`, and the next number is the next tag you push.
+Release tags follow [Semantic Versioning 2.0.0](https://semver.org/): `vMAJOR.MINOR.PATCH`, with an optional pre-release suffix `-alpha.N`, `-beta.N`, or `-rc.N`. Each push that publishes the project is tagged with the next number: a breaking change raises MAJOR, new behavior raises MINOR, and a fix or a documentation-only change raises PATCH. Pushing that tag is the version step. GitHub Actions builds each archive with cgo on a runner of that operating system, writes the tag into the binary, and attaches the archives to the [GitHub Release](https://github.com/cionz0/hdsort/releases). A local checkout stays `v0.0.0` until that tag is written into the binary.
 
 Download the archive for the machine and open it. Go is not required. On macOS, open `hdsort.app`: Finder shows its icon. On Windows, `hdsort_windows_amd64.exe` carries the same icon. On Linux, the archive also contains `hdsort.png` and `hdsort.desktop`; the file manager shows that icon after the desktop entry is installed.
 
@@ -50,7 +50,19 @@ The binary talks only to folders on that computer. It is not a cloud service.
 
 ## Status
 
-Prompts 01 through 13 are done.
+Prompts 01 through 13 are done. The notes under [Later ideas](#later-ideas) are not prompts and are not the next session.
+
+## Later ideas
+
+These are product notes only. They are not in [`docs/development-plan.md`](docs/development-plan.md), and no prompt exists for them yet. A session implements one only after a prompt is written. Where a note changes a rule that already has an ADR, that session adds a new ADR first.
+
+### Suggest files to remove from a folder
+
+Inspect one selected folder and suggest files the owner might delete, using signals other than “this is a duplicate.” Size and last use are the first criteria. Other criteria should be taken from programs that already do this kind of cleanup, including CleanMyMac, Gemini, and [czkawka](https://github.com/qarmin/czkawka). The suggestion still waits for an explicit delete. Today the only delete suggestions are the ones inside a duplicate group.
+
+### Reorganize the selected folder by file type
+
+Propose a new arrangement of the files that are already in the selected folder. The strategy depends on the kind of file. [ADR-0005](docs/adr/0005-layout-proposals-stay-inside-the-scan-root.md) still applies: a strategy other than the default needs its own ADR, every destination stays inside the scan root, and each move waits for confirmation. The strategy shipped today proposes no moves.
 
 ## License
 

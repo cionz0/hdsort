@@ -7,6 +7,6 @@ This file is for an agent session that implements hdsort. The product behavior i
 3. Implement only that prompt. Its `TestAcceptance_*` tests are part of the definition of done. The prompt is finished only when those tests and the tests from earlier prompts pass (`go test ./...`).
 4. Update diagrams and prose when the behavior they describe changes.
 5. Set that prompt’s row to `done`.
-6. If the prompt closed with no errors, warnings, open questions, or leftover work, commit, push, and update MemPalace when the chat decided something the repository does not record. Then stop. Do not start the next prompt.
+6. If the prompt closed with no errors, warnings, open questions, or leftover work, commit (README changes included), push, and tag that commit with the next SemVer version. Update MemPalace when the chat decided something the repository does not record. Then stop. Do not start the next prompt.
 
 Patterns you may use are listed in `docs/patterns.md`. A pattern that is not listed needs an ADR and a citation before any code uses it.
