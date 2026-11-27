@@ -30,11 +30,11 @@ go build -o hdsort ./cmd/hdsort
 ./hdsort
 ```
 
-`./hdsort` listens on `127.0.0.1` with an ephemeral port and prints the capability URL, `http://127.0.0.1:<port>/?token=<secret>`. It then opens that URL in the system browser. The embedded version stays `v0.0.0` until a release build replaces it with `-ldflags "-X main.version=vX.Y.Z"`. Prompt 10 adds the Release binaries for macOS, Linux, and Windows. A Release binary does not require a Go installation.
+`./hdsort` listens on `127.0.0.1` with an ephemeral port and prints the capability URL, `http://127.0.0.1:<port>/?token=<secret>`. It then opens that URL in the system browser. The embedded version stays `v0.0.0` until a release build replaces it with `-ldflags "-X main.version=vX.Y.Z"`. Prompt 11 adds the Release binaries for macOS, Linux, and Windows. A Release binary does not require a Go installation.
 
 ## Status
 
-Prompts 01 through 08 are done. Next session: [`prompts/09-scan-and-preview.md`](prompts/09-scan-and-preview.md).
+Prompts 01 through 08 are done. Next session: [`prompts/09-exact-only.md`](prompts/09-exact-only.md).
 
 ## License
 

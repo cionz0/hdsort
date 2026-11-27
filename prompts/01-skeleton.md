@@ -25,7 +25,7 @@ A Go module that builds a version command, with the package tree from `docs/arch
 
 ## Out of scope
 
-Domain types, hashing, HTTP, SQLite, and any third-party linter. `CGO_ENABLED` stays at its default in this workflow; prompt 10 sets `CGO_ENABLED=0` for releases.
+Domain types, hashing, HTTP, SQLite, and any third-party linter. `CGO_ENABLED` stays at its default in this workflow; prompt 11 sets `CGO_ENABLED=0` for releases.
 
 ## Acceptance tests
 

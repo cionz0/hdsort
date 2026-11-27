@@ -14,8 +14,9 @@ Status below is the source of truth for “what is next.” The session that fin
 | 6 | [prompts/06-plan-apply-layout.md](../prompts/06-plan-apply-layout.md) | done (`internal/app`) | Decisions, Trash, index commit, dry-run report, default layout |
 | 7 | [prompts/07-similar-files.md](../prompts/07-similar-files.md) | done (`internal/app`) | Cited similarity strategy, no delete suggestion |
 | 8 | [prompts/08-loopback-review.md](../prompts/08-loopback-review.md) | done (`internal/adapters/http`) | Loopback server, token, review page, dry-run control |
-| 9 | [prompts/09-scan-and-preview.md](../prompts/09-scan-and-preview.md) | not started | Start a scan from the page, previews by file id |
-| 10 | [prompts/10-release-binaries.md](../prompts/10-release-binaries.md) | not started | Cross-compiled GitHub Release binaries |
+| 9 | [prompts/09-exact-only.md](../prompts/09-exact-only.md) | not started | Exact-only scan mode; default scan still groups similar files |
+| 10 | [prompts/10-scan-and-preview.md](../prompts/10-scan-and-preview.md) | not started | Start a scan from the page, pass exactOnly, previews by file id |
+| 11 | [prompts/11-release-binaries.md](../prompts/11-release-binaries.md) | not started | Cross-compiled GitHub Release binaries |
 
 ## How to run a session
 

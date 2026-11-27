@@ -38,17 +38,22 @@ sequenceDiagram
   participant Scan as Scan use case
   participant Disk as Filesystem
   participant Hash as Hasher
-  Owner->>Page: Choose folder
+  Owner->>Page: Choose folder and exact-only or also similar
   Page->>Scan: Start scan
   Scan->>Disk: Walk the root
   Disk-->>Scan: Readable files, symlinks, and skipped placeholders
   Scan->>Hash: Content ID for each readable file
   Hash-->>Scan: Content IDs
   Note over Scan: Two or more files with one content ID form an exact group
+  alt exactOnly
+    Note over Scan: The similarity strategy is not called
+  else Default
+    Note over Scan: Similarity runs after the exact groups
+  end
   Scan-->>Page: Open session with exact groups and skipped paths
 ```
 
-Two readable files with the same bytes produce the same content ID, including two empty files. Two files that share a size and share the first and last 64 KiB but differ in the middle produce different content IDs.
+Two readable files with the same bytes produce the same content ID, including two empty files. Two files that share a size and share the first and last 64 KiB but differ in the middle produce different content IDs. With exact-only off, near-duplicates continue into UC-3. With exact-only on, those near-duplicates stay ungrouped.
 
 ## UC-2 Review exact duplicates
 
@@ -102,7 +107,7 @@ sequenceDiagram
   Note over Page: A byte-identical pair never arrives here
 ```
 
-ADR-0010 fixes the fingerprints. The separation this use case already required stays: no recommended deletes, and no overlap with exact groups. The owner can still record an explicit delete on a similar-group member.
+ADR-0010 fixes the fingerprints. The separation this use case already required stays: no recommended deletes, and no overlap with exact groups. The owner can still record an explicit delete on a similar-group member. An exact-only scan (ADR-0011) does not enter this use case.
 
 ## UC-4 Apply the confirmed plan
 

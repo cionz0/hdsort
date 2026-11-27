@@ -29,7 +29,7 @@ A loopback HTTP server serves the review page and the decision routes. Tests use
 
 ## Out of scope
 
-Starting a scan from the page (prompt 09) and previews. Wire `POST /scans/{id}/apply` and `POST /scans/{id}/dry-run` to the prompt 06 use cases so the page can finish UC-4 and UC-7.
+Starting a scan from the page (prompt 10) and previews. Wire `POST /scans/{id}/apply` and `POST /scans/{id}/dry-run` to the prompt 06 use cases so the page can finish UC-4 and UC-7.
 
 ## Acceptance tests
 

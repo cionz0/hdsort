@@ -1,4 +1,4 @@
-# Prompt 10 — Release binaries
+# Prompt 11 — Release binaries
 
 Implement this prompt only. Stop when its acceptance tests pass.
 
@@ -19,7 +19,7 @@ A tag `vMAJOR.MINOR.PATCH` builds one archive per target and attaches it to a Gi
 - `-ldflags` sets the version printed by prompt 01 to the tag.
 - Artifact names: `hdsort_<os>_<arch>` plus `.exe` on Windows, packed as `.tar.gz` or `.zip`.
 - README sections: what the program is (already there), how to build (`go build` with Go 1.27), how to run, and how to install a Release. Keep the “not a cloud service” facts accurate.
-- Set prompt 10 to `done` in `docs/development-plan.md` only after the workflow file is in the tree and the local build below passes. You do not need to push a tag in this session.
+- Set prompt 11 to `done` in `docs/development-plan.md` only after the workflow file is in the tree and the local build below passes. You do not need to push a tag in this session.
 
 ## Out of scope
 

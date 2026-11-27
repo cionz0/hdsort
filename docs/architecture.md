@@ -200,6 +200,22 @@ flowchart TD
 
 JPEG, PNG, and GIF use the 64-bit average hash from Buchner’s ImageHash library. Two images join a component when the Hamming distance is at most 10. `.txt` and `.md` use Charikar’s 64-bit simhash. Two texts join a component when the Hamming distance is at most 3. A similar group is one connected component. It has no delete recommendation. The owner can still record an explicit delete on a member.
 
+## Exact-only mode
+
+The default scan runs the similarity strategy above. An exact-only scan does not call it (ADR-0011). Near-duplicates stay ungrouped. Byte-identical files are still one exact group. The mode is stored on the session. Omitting it means similar files are included.
+
+```mermaid
+flowchart TD
+  refs[Readable files]
+  exact[Exact groups]
+  mode{exactOnly?}
+  sim[Similarity strategy]
+  none[No similar groups]
+  refs --> exact --> mode
+  mode -->|no, the default| sim
+  mode -->|yes| none
+```
+
 ## Sessions and apply
 
 ```mermaid
@@ -224,7 +240,7 @@ All routes require the capability token, in the cookie `hdsort_token` or in `Aut
 | Method and path | Behavior |
 | --- | --- |
 | `GET /?token=&scan=` | Sets the cookie and returns the review page for that session. Without `scan`, the page has empty sections and no Dry run or Apply controls. |
-| `POST /scans` | Body is a folder path, or an empty body that triggers the folder-dialog port. Starts a scan and returns a session id. |
+| `POST /scans` | Body is a folder path, or an empty body that triggers the folder-dialog port. Optional `exactOnly` (ADR-0011) limits the scan to byte-identical files. Omitted or false runs similarity. Starts a scan and returns a session id. |
 | `GET /scans/{id}` | Session: groups, recommendations, decisions, skips, layout proposals. |
 | `POST /scans/{id}/decisions` | Records keep, delete, or skip for one path (`path` and `choice`), or confirms one layout move (`moveFrom`). Sending both or neither is 400. |
 | `POST /scans/{id}/dry-run` | UC-7. Returns the plan report and writes nothing. A form POST returns the review page with the report and the sentence “Nothing was changed.” `Accept: application/json` returns the same report as JSON with `changed: false`. Validation failure is the same rejection as apply. |

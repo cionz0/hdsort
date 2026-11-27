@@ -14,3 +14,4 @@ Format: Michael Nygard, “Documenting Architecture Decisions,” 2011. <https:/
 | [0008](0008-library-location.md) | Library location | Accepted |
 | [0009](0009-dry-run-on-the-review-page.md) | Dry-run is a review-page action | Accepted |
 | [0010](0010-similarity-algorithms.md) | Similarity algorithms | Accepted |
+| [0011](0011-exact-only-scan-mode.md) | Exact-only is a scan mode | Accepted |
