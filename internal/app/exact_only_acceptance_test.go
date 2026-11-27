@@ -111,7 +111,7 @@ func nearDuplicatePNGs(t *testing.T) string {
 
 func scanMode(t *testing.T, root string, sim app.Similarizer, exactOnly bool) app.Result {
 	t.Helper()
-	result, err := app.Scan(root, "", filesystem.NewWalker(nil), filesystem.NewOpener(), hash.New(), sim, exactOnly)
+	result, err := app.Scan(root, "", filesystem.NewWalker(nil), filesystem.NewOpener(), hash.New(), sim, exactOnly, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

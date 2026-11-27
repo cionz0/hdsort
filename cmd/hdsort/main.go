@@ -1,19 +1,22 @@
-// Command hdsort is the composition root. It wires adapters and starts the
-// loopback review UI.
+// Command hdsort is the composition root. It wires adapters and opens the
+// native review window.
 package main
 
 import (
 	"fmt"
-	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/cionz0/hdsort/internal/adapters/filesystem"
+	"github.com/cionz0/hdsort/internal/adapters/gui"
 	"github.com/cionz0/hdsort/internal/adapters/hash"
-	httpadapter "github.com/cionz0/hdsort/internal/adapters/http"
 	"github.com/cionz0/hdsort/internal/adapters/similar"
 	"github.com/cionz0/hdsort/internal/adapters/sqlite"
 	"github.com/cionz0/hdsort/internal/adapters/trash"
 )
+
+// runWindow is the product entry. Tests replace it so they do not open a window.
+var runWindow = defaultWindow
 
 func main() {
 	if err := run(); err != nil {
@@ -23,14 +26,10 @@ func main() {
 }
 
 func run() error {
-	token, err := httpadapter.NewToken()
-	if err != nil {
-		return err
-	}
-	ln, err := httpadapter.Listen("127.0.0.1:0")
-	if err != nil {
-		return err
-	}
+	return runWindow()
+}
+
+func defaultWindow() error {
 	store, err := sqlite.OpenDefault()
 	if err != nil {
 		return err
@@ -40,10 +39,19 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	server := httpadapter.New(token, store, store, trasher, filesystem.NewOpener()).
-		WithScan(filesystem.NewWalker(nil), filesystem.NewOpener(), hash.New(), similar.New(), filesystem.NewSystemPicker())
-	url := fmt.Sprintf("http://%s/?token=%s", ln.Addr().String(), token)
-	fmt.Println(url)
-	go openBrowser(url)
-	return http.Serve(ln, server)
+	lib, err := sqlite.DefaultPath()
+	if err != nil {
+		return err
+	}
+	return gui.Run(gui.Deps{
+		Pick:    filesystem.NewSystemPicker(),
+		Walk:    filesystem.NewWalker(nil),
+		Files:   filesystem.NewOpener(),
+		ID:      hash.New(),
+		Similar: similar.New(),
+		Library: store,
+		Trash:   trasher,
+		Disk:    filesystem.NewOpener(),
+		DataDir: filepath.Dir(lib),
+	})
 }

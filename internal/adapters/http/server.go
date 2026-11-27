@@ -149,7 +149,7 @@ func (s *Server) postScan(w nethttp.ResponseWriter, r *nethttp.Request) {
 			return
 		}
 	}
-	result, err := app.Scan(root, "", s.walk, s.read, s.identify, s.similar, body.ExactOnly)
+	result, err := app.Scan(root, "", s.walk, s.read, s.identify, s.similar, body.ExactOnly, nil)
 	if err != nil {
 		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
 		return

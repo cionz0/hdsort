@@ -2,7 +2,7 @@
 
 hdsort is a local program that scans a folder, finds duplicate files, asks the user before deleting anything, and records the files they kept. Later scans compare new folders with that record.
 
-The skeleton, the domain model, content identity, the keeper policy, the SQLite library, apply, similar groups, and the loopback review page exist. Starting a scan from the page is what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
+The skeleton, the domain model, content identity, the keeper policy, the SQLite library, apply, similar groups, and the native review window exist. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
 
 ## System context
 
@@ -21,31 +21,31 @@ flowchart LR
 
 ## Containers
 
-The browser is the window. The Go process is the application. SQLite is the memory of survivors and of in-progress sessions.
+The native review window is drawn by the Go process (ADR-0013). SQLite is the memory of survivors and of in-progress sessions.
 
 ```mermaid
 flowchart LR
-  browser[Browser]
-  process[hdsort process]
+  owner[File owner]
+  process["hdsort process with native review window"]
   sqlite[(SQLite library and sessions)]
   disk[Filesystem]
   trash[OS Trash]
-  browser -->|loopback HTTP only| process
+  owner -->|chooses a folder and confirms each delete or move| process
   process --> sqlite
   process --> disk
   process --> trash
 ```
 
-The process binds `127.0.0.1` or `::1` (ADR-0002). It opens the capability URL in the system browser. A tag `vMAJOR.MINOR.PATCH` builds one binary for each of `darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`, and `windows/amd64`, with cgo enabled, on a runner of that operating system (ADR-0012). The binary’s version is that tag. The macOS archive contains `hdsort.app` with that icon. The Windows executable embeds the same icon. The Linux archive carries the icon next to a desktop entry.
+The process does not listen and does not open a browser. A tag `vMAJOR.MINOR.PATCH` builds one binary for each of `darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`, and `windows/amd64`, with cgo enabled, on a runner of that operating system (ADR-0012). The binary’s version is that tag. The macOS archive contains `hdsort.app` with that icon. The Windows executable embeds the same icon. The Linux archive carries the icon next to a desktop entry.
 
 ## Components
 
-Ports and Adapters: the use cases sit in the middle, the browser drives them, and filesystem, hasher, SQLite, and Trash are driven adapters. The Dependency Rule puts `internal/domain` at the center. `cmd/hdsort` is the only composition root.
+Ports and Adapters: the use cases sit in the middle, the native window drives them, and filesystem, hasher, SQLite, and Trash are driven adapters. The Dependency Rule puts `internal/domain` at the center. `cmd/hdsort` is the only composition root.
 
 ```mermaid
 flowchart TB
   subgraph driving [Driving adapter]
-    http[HTTP adapter]
+    window[Native review window]
   end
   subgraph core [Application core]
     app[Use cases in internal/app]
@@ -58,7 +58,7 @@ flowchart TB
     trasher[Trash adapter]
     picker[Folder dialog]
   end
-  http --> app
+  window --> app
   app --> domain
   walk -.->|implements a port declared in app| app
   hasher -.->|implements a port declared in app| app
@@ -71,7 +71,7 @@ Compile-time dependencies point inward. Adapters import `internal/app` so they c
 
 | Path | Role |
 | --- | --- |
-| `cmd/hdsort` | Composition root. Builds adapters, calls `ListenAndServe` on loopback, opens the browser. |
+| `cmd/hdsort` | Composition root. Builds adapters and opens the native review window. |
 | `internal/domain` | Content ID, groups, keeper ranking, plan checks, layout strategy results. Pure functions. |
 | `internal/app` | Use cases: scan, reconcile, decide, apply, propose layout. Declares the port interfaces it calls. |
 | `internal/adapters/filesystem` | Walk, skip rules, native folder dialog. |
@@ -79,7 +79,8 @@ Compile-time dependencies point inward. Adapters import `internal/app` so they c
 | `internal/adapters/similar` | Average hash for JPEG, PNG, and GIF. Simhash for `.txt` and `.md`. |
 | `internal/adapters/sqlite` | `LibraryRepository` and `SessionRepository`. WAL mode. |
 | `internal/adapters/trash` | Freedesktop Trash layout; macOS and Windows behind build tags. |
-| `internal/adapters/http` | Routes, cookie, review page. |
+| `internal/adapters/gui` | Native review window. Gio draws it. The use cases do not import Gio. |
+| `internal/adapters/http` | Loopback routes, cookie, and review page. Tested. The command does not start it. |
 
 Port interfaces stay small and live next to the use case that calls them (Go Code Review Comments: the consumer owns the interface).
 
@@ -234,6 +235,8 @@ Dry-run (ADR-0009) runs that same validation and returns the operations apply wo
 The default layout strategy adds no moves (ADR-0005). A confirmed move’s destination stays inside the scan root.
 
 ## HTTP surface
+
+The product window is the native review window. This section documents the HTTP adapter that remains in the tree. The command does not listen.
 
 All routes require the capability token, in the cookie `hdsort_token` or in `Authorization: Bearer`.
 

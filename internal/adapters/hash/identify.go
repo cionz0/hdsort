@@ -29,7 +29,17 @@ func New() Hasher { return Hasher{} }
 // Identify assigns a content ID to each file the filters could not separate.
 // The content ID is the hex BLAKE3 digest of the full bytes. Files separated
 // by size or by the partial filter are not fully read and keep an empty content ID.
-func (Hasher) Identify(files []app.FileEntry, source app.FileReader) ([]domain.FileRef, error) {
+func (h Hasher) Identify(files []app.FileEntry, source app.FileReader) ([]domain.FileRef, error) {
+	return h.IdentifyReporting(files, source, nil)
+}
+
+// IdentifyReporting is Identify and names each ADR-0007 filter as it runs.
+func (Hasher) IdentifyReporting(files []app.FileEntry, source app.FileReader, report func(path string, size int64, stage app.HashStage, finished bool)) ([]domain.FileRef, error) {
+	note := func(file app.FileEntry, stage app.HashStage, finished bool) {
+		if report != nil {
+			report(file.Path, file.Size, stage, finished)
+		}
+	}
 	refs := make([]domain.FileRef, len(files))
 	var small []int
 	buckets := make(map[int64][]int)
@@ -52,6 +62,7 @@ func (Hasher) Identify(files []app.FileEntry, source app.FileReader) ([]domain.F
 	}
 
 	for _, i := range small {
+		note(files[i], app.StageFull, true)
 		id, err := fullID(source, files[i].Path)
 		if err != nil {
 			return nil, err
@@ -61,9 +72,15 @@ func (Hasher) Identify(files []app.FileEntry, source app.FileReader) ([]domain.F
 	for _, size := range sizes {
 		idxs := buckets[size]
 		if len(idxs) < 2 {
+			for _, i := range idxs {
+				note(files[i], app.StageSize, true)
+			}
 			continue
 		}
-		if err := partialThenFull(files, idxs, refs, source); err != nil {
+		for _, i := range idxs {
+			note(files[i], app.StageSize, false)
+		}
+		if err := partialThenFull(files, idxs, refs, source, note); err != nil {
 			return nil, err
 		}
 	}
@@ -73,27 +90,34 @@ func (Hasher) Identify(files []app.FileEntry, source app.FileReader) ([]domain.F
 // partialThenFull hashes the head, and the tail only when the head matches
 // another file in the size bucket. The full digest runs only when the partial
 // hash also matches.
-func partialThenFull(files []app.FileEntry, idxs []int, refs []domain.FileRef, source app.FileReader) error {
-	headGroups, headOrder, err := groupByRange(files, idxs, source, 0)
+func partialThenFull(files []app.FileEntry, idxs []int, refs []domain.FileRef, source app.FileReader, note func(app.FileEntry, app.HashStage, bool)) error {
+	headGroups, headOrder, err := groupByRange(files, idxs, source, 0, note)
 	if err != nil {
 		return err
 	}
 	for _, key := range headOrder {
 		members := headGroups[key]
 		if len(members) < 2 {
+			for _, idx := range members {
+				note(files[idx], app.StagePartial, true)
+			}
 			continue
 		}
 		offset := files[members[0]].Size - partialWindow
-		tailGroups, tailOrder, err := groupByRange(files, members, source, offset)
+		tailGroups, tailOrder, err := groupByRange(files, members, source, offset, note)
 		if err != nil {
 			return err
 		}
 		for _, tailKey := range tailOrder {
 			same := tailGroups[tailKey]
 			if len(same) < 2 {
+				for _, idx := range same {
+					note(files[idx], app.StagePartial, true)
+				}
 				continue
 			}
 			for _, idx := range same {
+				note(files[idx], app.StageFull, true)
 				id, err := fullID(source, files[idx].Path)
 				if err != nil {
 					return err
@@ -105,10 +129,11 @@ func partialThenFull(files []app.FileEntry, idxs []int, refs []domain.FileRef, s
 	return nil
 }
 
-func groupByRange(files []app.FileEntry, idxs []int, source app.FileReader, offset int64) (map[string][]int, []string, error) {
+func groupByRange(files []app.FileEntry, idxs []int, source app.FileReader, offset int64, note func(app.FileEntry, app.HashStage, bool)) (map[string][]int, []string, error) {
 	groups := make(map[string][]int)
 	var order []string
 	for _, idx := range idxs {
+		note(files[idx], app.StagePartial, false)
 		sum, err := hashRange(source, files[idx].Path, offset, partialWindow)
 		if err != nil {
 			return nil, nil, err
@@ -160,5 +185,6 @@ func fullID(source app.FileReader, path string) (domain.ContentID, error) {
 
 var (
 	_ app.Identifier      = Hasher{}
+	_ app.StageReporter   = Hasher{}
 	_ app.ContentIDSource = Hasher{}
 )

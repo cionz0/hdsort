@@ -1,6 +1,6 @@
 # ADR 0002: Loopback web UI in one Go binary
 
-- Status: Accepted
+- Status: Superseded by ADR-0013
 - Date: 2026-11-26
 
 ## Context

@@ -8,9 +8,9 @@ The words in this file are the names from those sources. Packages may use the sh
 
 | Name in this repo | Source | Where it applies |
 | --- | --- | --- |
-| Ports and Adapters (Hexagonal Architecture) | Alistair Cockburn, “Hexagonal Architecture,” 2005. <https://alistair.cockburn.us/hexagonal-architecture/> | The process is the application inside the hexagon. The browser, filesystem, SQLite, and Trash sit outside and talk through ports. |
+| Ports and Adapters (Hexagonal Architecture) | Alistair Cockburn, “Hexagonal Architecture,” 2005. <https://alistair.cockburn.us/hexagonal-architecture/> | The process is the application inside the hexagon. The native window, filesystem, SQLite, and Trash sit outside and talk through ports. |
 | Dependency Rule | Robert C. Martin, “The Clean Architecture,” 2012. <https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html> | Source dependencies point toward `internal/domain`. Domain imports none of the other internal packages. Adapters are wired in `cmd/hdsort` only. |
-| Functional core, imperative shell | Gary Bernhardt, “Boundaries,” 2012. <https://www.destroyallsoftware.com/talks/boundaries> | Content identity, grouping, keeper ranking, and plan validation are pure functions. Walking, hashing, SQL, HTTP, and Trash are the shell. |
+| Functional core, imperative shell | Gary Bernhardt, “Boundaries,” 2012. <https://www.destroyallsoftware.com/talks/boundaries> | Content identity, grouping, keeper ranking, and plan validation are pure functions. Walking, hashing, SQL, the window, and Trash are the shell. |
 | C4 model | Simon Brown, “The C4 model for visualising software architecture.” <https://c4model.com/> | `docs/architecture.md` uses System Context, Container, and Component. Mermaid is the rendering format, not a C4 notation. GitHub renders Mermaid in Markdown: <https://github.blog/2022-02-14-include-diagrams-markdown-files-mermaid/> |
 | Architecture Decision Records | Michael Nygard, “Documenting Architecture Decisions,” 2011. <https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions> | `docs/adr/`. Status, context, decision, consequences. |
 
@@ -19,6 +19,7 @@ The words in this file are the names from those sources. Packages may use the sh
 | Name in this repo | Source | Where it applies |
 | --- | --- | --- |
 | Strategy | Erich Gamma, Richard Helm, Ralph Johnson, John Vlissides, *Design Patterns*, Addison-Wesley, 1994, “Strategy.” | Interchangeable keeper policy, similarity policy, and layout policy. The use case depends on the policy interface, not on a concrete rule. |
+| Immediate-mode GUI | Elias Naur and the Gio authors, Gio, immediate-mode GUI for Go, 2019. <https://gioui.org> | `internal/adapters/gui`. The use cases do not import Gio. |
 | Pipes and Filters | Frank Buschmann, Regine Meunier, Hans Rohnert, Peter Sommerlad, Michael Stal, *Pattern-Oriented Software Architecture, Volume 1*, Wiley, 1996, “Pipes and Filters.” The same staging is how `jdupes` avoids hashing every byte twice: <https://github.com/jbruchon/jdupes> | Size filter, then a partial-hash filter, then a full BLAKE3 filter. A later filter runs only for files the earlier filter could not separate. |
 | Repository | Eric Evans, *Domain-Driven Design*, Addison-Wesley, 2003, “Repositories.” | `LibraryRepository` and `SessionRepository` hide SQLite. Use cases see collection-style operations, not SQL. |
 
@@ -41,7 +42,7 @@ These are language practices from the Go project, not additional architecture.
 | --- | --- | --- |
 | Acceptance tests are the specification | Gojko Adzic, *Specification by Example*, Manning, 2011. Steve Freeman and Nat Pryce, *Growing Object-Oriented Software, Guided by Tests*, Addison-Wesley, 2009 (the outer acceptance loop). | Tests named `TestAcceptance_<Behavior>`. The prompt files list them before the code exists. |
 | Semantic Versioning for release tags | Tom Preston-Werner, Semantic Versioning 2.0.0. <https://semver.org/> | Git tags `vMAJOR.MINOR.PATCH`. Pre-release tags use a dot after the identifier (`v0.1.0-alpha.1`). |
-| Loopback-only administrative UI | The HTTP server binds `127.0.0.1` or `::1`. W3C Secure Contexts treats `http://127.0.0.1` as a potentially trustworthy origin. <https://www.w3.org/TR/secure-contexts/#localhost> | ADR-0002. |
+| Loopback-only administrative UI | The HTTP server binds `127.0.0.1` or `::1`. W3C Secure Contexts treats `http://127.0.0.1` as a potentially trustworthy origin. <https://www.w3.org/TR/secure-contexts/#localhost> | Superseded for the product UI by ADR-0013. The HTTP adapter remains tested. |
 | Opaque identifiers instead of raw paths | OWASP, “Path Traversal.” <https://owasp.org/www-community/attacks/Path_Traversal> | Preview and delete commands take a file id issued by the session. A request that supplies a filesystem path is rejected. |
 | SQLite WAL mode | SQLite, “Write-Ahead Logging.” <https://www.sqlite.org/wal.html> | The library file. One writer: the hdsort process. |
 | XDG Base Directory for the data file on Linux | Freedesktop, “XDG Base Directory Specification.” <https://specifications.freedesktop.org/basedir-spec/latest/> | `$XDG_DATA_HOME/hdsort` or `~/.local/share/hdsort`. |

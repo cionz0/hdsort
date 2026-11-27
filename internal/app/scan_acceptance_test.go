@@ -276,7 +276,7 @@ func TestAcceptance_PartialHashDoesNotFullReadDifferentHeads(t *testing.T) {
 	writeFile(t, pathB, bodyB)
 
 	counter := &countingSource{inner: filesystem.NewOpener()}
-	result, err := app.Scan(root, "", filesystem.NewWalker(nil), counter, hash.New(), similar.New(), false)
+	result, err := app.Scan(root, "", filesystem.NewWalker(nil), counter, hash.New(), similar.New(), false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +300,7 @@ func TestAcceptance_PartialHashDoesNotFullReadDifferentHeads(t *testing.T) {
 
 func scan(t *testing.T, root, dataDir string, probe filesystem.Probe) app.Result {
 	t.Helper()
-	result, err := app.Scan(root, dataDir, filesystem.NewWalker(probe), filesystem.NewOpener(), hash.New(), similar.New(), false)
+	result, err := app.Scan(root, dataDir, filesystem.NewWalker(probe), filesystem.NewOpener(), hash.New(), similar.New(), false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

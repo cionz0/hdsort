@@ -2,9 +2,9 @@
 
 hdsort scans a folder on your machine, finds duplicate files, and asks you before it deletes anything. Files you keep are recorded in a local library. The next scan compares the new folder both with itself and with that library.
 
-The review UI is a page served by the program on `127.0.0.1`. From that page the owner can dry-run the current decisions and see what would change; a dry-run writes nothing. The files never leave the computer. Cloud copies are included only when a sync client has already stored them in a local folder.
+The review UI is a native window. From that window the owner can dry-run the current decisions and see what would change; a dry-run writes nothing. The files never leave the computer. Cloud copies are included only when a sync client has already stored them in a local folder.
 
-This repository is the specification and the build plan. The module, package tree, version command, domain model, content-identity scan, keeper policy, SQLite library, apply, similar groups, exact-only scan mode, scan start, previews, the loopback review page, and the release workflow exist. Each file in [`prompts/`](prompts/) is one implementation session, in the order listed in [`docs/development-plan.md`](docs/development-plan.md).
+This repository is the specification and the build plan. The module, package tree, version command, domain model, content-identity scan, keeper policy, SQLite library, apply, similar groups, exact-only scan mode, scan start, previews, the native review window, and the release workflow exist. The loopback review adapter remains tested and is not what `./hdsort` opens. Each file in [`prompts/`](prompts/) is one implementation session, in the order listed in [`docs/development-plan.md`](docs/development-plan.md).
 
 ## Documentation
 
@@ -30,7 +30,7 @@ go build -o hdsort ./cmd/hdsort
 ./hdsort
 ```
 
-`./hdsort` listens on `127.0.0.1` with an ephemeral port and prints the capability URL, `http://127.0.0.1:<port>/?token=<secret>`. It then opens that URL in the system browser. A build from source keeps the version `v0.0.0`. A release build replaces it with `-ldflags "-X main.version=vX.Y.Z"`.
+`./hdsort` opens the native review window. It does not listen and it does not open a browser. A build from source keeps the version `v0.0.0`. A release build replaces it with `-ldflags "-X main.version=vX.Y.Z"`.
 
 ## Install a release
 
@@ -50,7 +50,7 @@ The binary talks only to folders on that computer. It is not a cloud service.
 
 ## Status
 
-Prompts 01 through 11 are done. Next session: [`prompts/12-native-window.md`](prompts/12-native-window.md).
+Prompts 01 through 12 are done.
 
 ## License
 

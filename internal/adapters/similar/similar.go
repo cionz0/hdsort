@@ -44,21 +44,36 @@ type finger struct {
 // Similar returns connected components of files that are close and not
 // byte-identical. A file that shares its content ID with another file is
 // omitted. The groups have no delete recommendation.
-func (Strategy) Similar(files []domain.FileRef, source app.FileReader) ([]domain.SimilarGroup, error) {
+func (s Strategy) Similar(files []domain.FileRef, source app.FileReader) ([]domain.SimilarGroup, error) {
+	return s.SimilarReporting(files, source, nil)
+}
+
+// SimilarReporting is Similar and reports each candidate as it is compared.
+func (Strategy) SimilarReporting(files []domain.FileRef, source app.FileReader, report func(done, total int)) ([]domain.SimilarGroup, error) {
 	counts := map[domain.ContentID]int{}
 	for _, file := range files {
 		if file.Readable && file.ContentID != "" {
 			counts[file.ContentID]++
 		}
 	}
-	var prints []finger
+	var candidates []domain.FileRef
 	for _, file := range files {
 		if !file.Readable || file.ContentID == "" || counts[file.ContentID] != 1 {
 			continue
 		}
+		candidates = append(candidates, file)
+	}
+	if report != nil {
+		report(0, len(candidates))
+	}
+	var prints []finger
+	for i, file := range candidates {
 		print, ok, err := fingerprint(file, source)
 		if err != nil {
 			return nil, err
+		}
+		if report != nil {
+			report(i+1, len(candidates))
 		}
 		if !ok {
 			continue
@@ -158,4 +173,7 @@ func components(prints []finger) ([]domain.SimilarGroup, error) {
 	return groups, nil
 }
 
-var _ app.Similarizer = Strategy{}
+var (
+	_ app.Similarizer          = Strategy{}
+	_ app.ReportingSimilarizer = Strategy{}
+)

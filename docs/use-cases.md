@@ -1,6 +1,6 @@
 # Use cases
 
-The person in these use cases is the owner of the files. The system is the hdsort process and the browser window it opens. Acceptance tests for each use case are listed in the prompt that implements it (`docs/development-plan.md`).
+The person in these use cases is the owner of the files. The system is the hdsort process and the native review window it opens. Acceptance tests for each use case are listed in the prompt that implements it (`docs/development-plan.md`).
 
 ```mermaid
 flowchart LR
@@ -34,12 +34,12 @@ The walk does not follow symlinks, does not hash dataless placeholders, and skip
 ```mermaid
 sequenceDiagram
   actor Owner
-  participant Page as Review page
+  participant Window as Review window
   participant Scan as Scan use case
   participant Disk as Filesystem
   participant Hash as Hasher
-  Owner->>Page: Choose folder and exact-only or also similar
-  Page->>Scan: Start scan
+  Owner->>Window: Choose folder and exact-only or also similar
+  Window->>Scan: Start scan
   Scan->>Disk: Walk the root
   Disk-->>Scan: Readable files, symlinks, and skipped placeholders
   Scan->>Hash: Content ID for each readable file
@@ -50,7 +50,7 @@ sequenceDiagram
   else Default
     Note over Scan: Similarity runs after the exact groups
   end
-  Scan-->>Page: Open session with exact groups and skipped paths
+  Scan-->>Window: Open session with exact groups and skipped paths
 ```
 
 Two readable files with the same bytes produce the same content ID, including two empty files. Two files that share a size and share the first and last 64 KiB but differ in the middle produce different content IDs. With exact-only off, near-duplicates continue into UC-3. With exact-only on, those near-duplicates stay ungrouped.
@@ -62,15 +62,15 @@ The owner looks at exact groups. Each group is either given one recommendation o
 ```mermaid
 sequenceDiagram
   actor Owner
-  participant Page as Review page
+  participant Window as Review window
   participant Policy as Keeper policy
-  Page->>Policy: Exact group
+  Window->>Policy: Exact group
   alt A library survivor or a plain name wins
-    Policy-->>Page: Keeper, delete list, reason code
+    Policy-->>Window: Keeper, delete list, reason code
   else Names and library rank still tie
-    Policy-->>Page: No recommendation
+    Policy-->>Window: No recommendation
   end
-  Owner->>Page: Keep, delete, or skip each file
+  Owner->>Window: Keep, delete, or skip each file
 ```
 
 The recommendation the owner sees follows the rank in `docs/architecture.md`:
@@ -84,27 +84,27 @@ The recommendation the owner sees follows the rank in `docs/architecture.md`:
 
 The ownerâ€™s decision is stored against the file id. Nothing is trashed in this use case.
 
-When the scan root has a synced-folder path segment (`CloudStorage`, `Mobile Documents`, `Dropbox`, or `Google Drive`), the page shows the banner from `docs/architecture.md` before the owner confirms a delete.
+When the scan root has a synced-folder path segment (`CloudStorage`, `Mobile Documents`, `Dropbox`, or `Google Drive`), the window shows the banner from `docs/architecture.md` before the owner confirms a delete.
 
 ## UC-3 Review similar files
 
-The owner inspects files that are close but not byte-identical. The page shows them apart from exact groups and does not suggest which one to delete.
+The owner inspects files that are close but not byte-identical. The window shows them apart from exact groups and does not suggest which one to delete.
 
 ```mermaid
 sequenceDiagram
   actor Owner
   participant Scan as Scan use case
   participant Sim as Similarity strategy
-  participant Page as Review page
+  participant Window as Review window
   Scan->>Sim: Files that are not exact duplicates
   alt JPEG, PNG, or GIF
     Sim->>Sim: 64-bit average hash, Hamming distance at most 10
   else txt or md
     Sim->>Sim: 64-bit simhash, Hamming distance at most 3
   end
-  Sim-->>Page: Similar group, no delete recommendation
-  Owner->>Page: Explicit keep, delete, or skip
-  Note over Page: A byte-identical pair never arrives here
+  Sim-->>Window: Similar group, no delete recommendation
+  Owner->>Window: Explicit keep, delete, or skip
+  Note over Window: A byte-identical pair never arrives here
 ```
 
 ADR-0010 fixes the fingerprints. The separation this use case already required stays: no recommended deletes, and no overlap with exact groups. The owner can still record an explicit delete on a similar-group member. An exact-only scan (ADR-0011) does not enter this use case.
@@ -146,14 +146,14 @@ The owner sees a list of moves for the files that remain. The default strategyâ€
 sequenceDiagram
   actor Owner
   participant Layout as Layout strategy
-  participant Page as Review page
+  participant Window as Review window
   participant Disk as Filesystem
-  Layout-->>Page: Zero or more moves inside the scan root
+  Layout-->>Window: Zero or more moves inside the scan root
   alt The owner confirms a move
-    Owner->>Page: Confirm move
-    Page->>Disk: Move inside the root, on apply
+    Owner->>Window: Confirm move
+    Window->>Disk: Move inside the root, on apply
   else The list is empty or the owner skips
-    Page-->>Owner: Paths stay where they are
+    Window-->>Owner: Paths stay where they are
   end
 ```
 
@@ -185,23 +185,23 @@ A stale entry does not make the remaining files look like duplicates of a missin
 
 ## UC-7 Dry-run the plan
 
-The owner asks the review page what the current decisions would do. hdsort runs the same checks as UC-4 and shows the Trash paths, the confirmed moves, and the library rows it would write. Files, Trash, and the library stay as they were. The session stays `open`. Apply remains a separate action.
+The owner asks the review window what the current decisions would do. hdsort runs the same checks as UC-4 and shows the Trash paths, the confirmed moves, and the library rows it would write. Files, Trash, and the library stay as they were. The session stays `open`. Apply remains a separate action.
 
 ```mermaid
 sequenceDiagram
   actor Owner
-  participant Page as Review page
+  participant Window as Review window
   participant Plan as Plan preview
   participant Disk as Filesystem and library
-  Owner->>Page: Dry run
-  Page->>Plan: Same checks as apply
+  Owner->>Window: Dry run
+  Window->>Plan: Same checks as apply
   alt The plan is valid
-    Plan-->>Page: Trash list, moves, library upserts
-    Page-->>Owner: Report, and Nothing was changed
+    Plan-->>Window: Trash list, moves, library upserts
+    Window-->>Owner: Report, and Nothing was changed
     Note over Disk: No writes
   else The plan is rejected
-    Plan-->>Page: Same rejection apply would return
-    Page-->>Owner: Rejection, and Nothing was changed
+    Plan-->>Window: Same rejection apply would return
+    Window-->>Owner: Rejection, and Nothing was changed
     Note over Disk: No writes
   end
 ```
