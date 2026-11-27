@@ -54,4 +54,12 @@ Prompts 01 through 11 are done. Next session: [`prompts/12-native-window.md`](pr
 
 ## License
 
-Not chosen yet.
+Noncommercial use is free under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0). Every copy must keep this line:
+
+```text
+Required Notice: Copyright 2026 cionzo (https://github.com/cionz0/hdsort)
+```
+
+That notice is the credit.
+
+Commercial use is not granted by that license. It needs a separate paid license from the copyright holder. Write to vincenzo@filotrack.com. This repository does not set the price. A company using hdsort for its own files is commercial use. Personal, hobby, and noncommercial-organization use is free.
