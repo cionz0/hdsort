@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=hdsort
+Comment=Review duplicate files on this computer
+Exec=hdsort
+Icon=hdsort
+Terminal=false
+Categories=Utility;

@@ -30,21 +30,35 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           set -eu
+          root="$PWD"
           for spec in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64; do
             goos="${spec%/*}"
             goarch="${spec#*/}"
             name="hdsort_${goos}_${goarch}"
+            stage="$(mktemp -d)"
             bin="$name"
             if [ "$goos" = "windows" ]; then
               bin="${name}.exe"
             fi
             CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
-              go build -ldflags "-X main.version=${VERSION}" -o "$bin" ./cmd/hdsort
-            if [ "$goos" = "windows" ]; then
-              zip "${name}.zip" "$bin"
+              go build -ldflags "-X main.version=${VERSION}" -o "$stage/$bin" ./cmd/hdsort
+            if [ "$goos" = "darwin" ]; then
+              app="$stage/hdsort.app/Contents"
+              mkdir -p "$app/MacOS" "$app/Resources"
+              mv "$stage/$bin" "$app/MacOS/hdsort"
+              chmod +x "$app/MacOS/hdsort"
+              cp assets/icon/icon.icns "$app/Resources/hdsort.icns"
+              sed "s/__VERSION__/${VERSION#v}/g" assets/icon/Info.plist > "$app/Info.plist"
+              tar -czf "$root/${name}.tar.gz" -C "$stage" hdsort.app
+            elif [ "$goos" = "windows" ]; then
+              # The icon is linked from cmd/hdsort/rsrc_windows_amd64.syso.
+              (cd "$stage" && zip "$root/${name}.zip" "$bin")
             else
-              tar -czf "${name}.tar.gz" "$bin"
+              cp assets/icon/icon.png "$stage/hdsort.png"
+              sed "s/^Exec=.*/Exec=${bin}/" assets/icon/hdsort.desktop > "$stage/hdsort.desktop"
+              tar -czf "$root/${name}.tar.gz" -C "$stage" "$bin" hdsort.png hdsort.desktop
             fi
+            rm -rf "$stage"
           done
       - name: Publish the GitHub Release
         env:

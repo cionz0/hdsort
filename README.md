@@ -36,12 +36,12 @@ go build -o hdsort ./cmd/hdsort
 
 Release tags follow [Semantic Versioning 2.0.0](https://semver.org/): `vMAJOR.MINOR.PATCH`, with an optional pre-release suffix `-alpha.N`, `-beta.N`, or `-rc.N`. Pushing that tag is the only version step. GitHub Actions writes the tag into the binary and attaches one archive per target to the [GitHub Release](https://github.com/cionz0/hdsort/releases). A local checkout does not change `v0.0.0`, and the next number is the next tag you push.
 
-Download the archive for the machine, unpack it, and run the binary. Go is not required.
+Download the archive for the machine and open it. Go is not required. On macOS, open `hdsort.app`: Finder shows its icon. On Windows, `hdsort_windows_amd64.exe` carries the same icon. On Linux, the archive also contains `hdsort.png` and `hdsort.desktop`; the file manager shows that icon after the desktop entry is installed.
 
 | Machine | Archive |
 | --- | --- |
-| macOS Intel | `hdsort_darwin_amd64.tar.gz` |
-| macOS Apple silicon | `hdsort_darwin_arm64.tar.gz` |
+| macOS Intel | `hdsort_darwin_amd64.tar.gz` (contains `hdsort.app`) |
+| macOS Apple silicon | `hdsort_darwin_arm64.tar.gz` (contains `hdsort.app`) |
 | Linux x86-64 | `hdsort_linux_amd64.tar.gz` |
 | Linux arm64 | `hdsort_linux_arm64.tar.gz` |
 | Windows x86-64 | `hdsort_windows_amd64.zip` (contains `hdsort_windows_amd64.exe`) |
