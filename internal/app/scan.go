@@ -41,6 +41,15 @@ type Identifier interface {
 	Identify(files []FileEntry, source FileReader) ([]domain.FileRef, error)
 }
 
+// Similarizer attaches similar groups after exact grouping.
+// The scan depends on this Strategy, not on a concrete fingerprint.
+//
+// Pattern: Strategy (Gamma, Helm, Johnson, Vlissides, 1994).
+// See docs/patterns.md.
+type Similarizer interface {
+	Similar(files []domain.FileRef, source FileReader) ([]domain.SimilarGroup, error)
+}
+
 // Result is a finished scan: an open session plus every readable file ref,
 // including files that are not in an exact group.
 type Result struct {
@@ -48,10 +57,12 @@ type Result struct {
 	Files   []domain.FileRef
 }
 
-// Scan walks root, hashes the readable files, and groups exact duplicates.
-// Dataless files and symlinks are listed on the session and are not hashed.
-// A symlink keeps its destination so the owner can see what the link is.
-func Scan(root, dataDir string, walk Walker, files FileReader, id Identifier) (Result, error) {
+// Scan walks root, hashes the readable files, groups exact duplicates, and
+// then asks the similarity strategy for groups that are close but not
+// byte-identical. Dataless files and symlinks are listed on the session and
+// are not hashed. A symlink keeps its destination so the owner can see what
+// the link is.
+func Scan(root, dataDir string, walk Walker, files FileReader, id Identifier, sim Similarizer) (Result, error) {
 	entries, err := walk.Walk(root, dataDir)
 	if err != nil {
 		return Result{}, err
@@ -84,8 +95,13 @@ func Scan(root, dataDir string, walk Walker, files FileReader, id Identifier) (R
 	if err != nil {
 		return Result{}, err
 	}
+	similar, err := sim.Similar(refs, files)
+	if err != nil {
+		return Result{}, err
+	}
 	session := domain.NewSession(root)
 	session.Exact = groups
+	session.Similar = similar
 	session.Skipped = skipped
 	return Result{Session: session, Files: refs}, nil
 }

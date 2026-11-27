@@ -88,14 +88,21 @@ The owner inspects files that are close but not byte-identical. The page shows t
 ```mermaid
 sequenceDiagram
   actor Owner
-  participant Page as Review page
+  participant Scan as Scan use case
   participant Sim as Similarity strategy
+  participant Page as Review page
+  Scan->>Sim: Files that are not exact duplicates
+  alt JPEG, PNG, or GIF
+    Sim->>Sim: 64-bit average hash, Hamming distance at most 10
+  else txt or md
+    Sim->>Sim: 64-bit simhash, Hamming distance at most 3
+  end
   Sim-->>Page: Similar group, no delete recommendation
   Owner->>Page: Explicit keep, delete, or skip
   Note over Page: A byte-identical pair never arrives here
 ```
 
-The strategy itself is chosen later, in an ADR written at the start of prompt 07, because the algorithm has to be a cited one. The behavior this use case already fixes is the separation: no recommended deletes, and no overlap with exact groups.
+ADR-0010 fixes the fingerprints. The separation this use case already required stays: no recommended deletes, and no overlap with exact groups. The owner can still record an explicit delete on a similar-group member.
 
 ## UC-4 Apply the confirmed plan
 

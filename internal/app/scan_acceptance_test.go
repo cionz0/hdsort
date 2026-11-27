@@ -8,6 +8,7 @@ import (
 
 	"github.com/cionz0/hdsort/internal/adapters/filesystem"
 	"github.com/cionz0/hdsort/internal/adapters/hash"
+	"github.com/cionz0/hdsort/internal/adapters/similar"
 	"github.com/cionz0/hdsort/internal/app"
 	"github.com/cionz0/hdsort/internal/domain"
 )
@@ -275,7 +276,7 @@ func TestAcceptance_PartialHashDoesNotFullReadDifferentHeads(t *testing.T) {
 	writeFile(t, pathB, bodyB)
 
 	counter := &countingSource{inner: filesystem.NewOpener()}
-	result, err := app.Scan(root, "", filesystem.NewWalker(nil), counter, hash.New())
+	result, err := app.Scan(root, "", filesystem.NewWalker(nil), counter, hash.New(), similar.New())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +300,7 @@ func TestAcceptance_PartialHashDoesNotFullReadDifferentHeads(t *testing.T) {
 
 func scan(t *testing.T, root, dataDir string, probe filesystem.Probe) app.Result {
 	t.Helper()
-	result, err := app.Scan(root, dataDir, filesystem.NewWalker(probe), filesystem.NewOpener(), hash.New())
+	result, err := app.Scan(root, dataDir, filesystem.NewWalker(probe), filesystem.NewOpener(), hash.New(), similar.New())
 	if err != nil {
 		t.Fatal(err)
 	}

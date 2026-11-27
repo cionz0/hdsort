@@ -2,7 +2,7 @@
 
 hdsort is a local program that scans a folder, finds duplicate files, asks the user before deleting anything, and records the files they kept. Later scans compare new folders with that record.
 
-The skeleton, the domain model, content identity, the keeper policy, the SQLite library, and apply exist. Review is what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
+The skeleton, the domain model, content identity, the keeper policy, the SQLite library, apply, and similar groups exist. Review is what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
 
 ## System context
 
@@ -76,6 +76,7 @@ Compile-time dependencies point inward. Adapters import `internal/app` so they c
 | `internal/app` | Use cases: scan, reconcile, decide, apply, propose layout. Declares the port interfaces it calls. |
 | `internal/adapters/filesystem` | Walk, skip rules, native folder dialog. |
 | `internal/adapters/hash` | Size, partial BLAKE3, full BLAKE3. |
+| `internal/adapters/similar` | Average hash for JPEG, PNG, and GIF. Simhash for `.txt` and `.md`. |
 | `internal/adapters/sqlite` | `LibraryRepository` and `SessionRepository`. WAL mode. |
 | `internal/adapters/trash` | Freedesktop Trash layout; macOS and Windows behind build tags. |
 | `internal/adapters/http` | Routes, cookie, review page. |
@@ -177,7 +178,27 @@ Refresh keeps the content ID and the path, and writes the file's current size, m
 
 ## Similarity
 
-Similarity is a second Strategy, invoked after exact grouping. Its output is a similar group and nothing else. The algorithm and the threshold are not chosen in this document. Prompt 07 adds them by ADR, citing the paper or specification of the algorithm, before any code lands. Byte-identical files never appear in a similar group (ADR-0003).
+Similarity is a second Strategy, invoked after exact grouping (ADR-0003, ADR-0010). A file that shares a content ID with another file in the scan is exact only and is not passed in.
+
+```mermaid
+flowchart TD
+  files[Files that are not exact duplicates]
+  kind{Extension}
+  image[64-bit average hash]
+  text[64-bit simhash]
+  skip[No fingerprint]
+  near{Hamming distance within the ADR-0010 cutoff?}
+  group[Similar group, no delete recommendation]
+  files --> kind
+  kind -->|JPEG, PNG, or GIF| image
+  kind -->|txt or md| text
+  kind -->|anything else| skip
+  image --> near
+  text --> near
+  near -->|yes, same kind| group
+```
+
+JPEG, PNG, and GIF use the 64-bit average hash from Buchner’s ImageHash library. Two images join a component when the Hamming distance is at most 10. `.txt` and `.md` use Charikar’s 64-bit simhash. Two texts join a component when the Hamming distance is at most 3. A similar group is one connected component. It has no delete recommendation. The owner can still record an explicit delete on a member.
 
 ## Sessions and apply
 
@@ -222,6 +243,5 @@ The SQLite file lives in the OS application-data directory (ADR-0008). Tests pas
 
 ## What this document does not decide
 
-- Which perceptual hash or text similarity function to use. Prompt 07 writes that ADR first.
 - Code signing and notarization for macOS releases.
 - A command that gathers library entries into a single folder.
