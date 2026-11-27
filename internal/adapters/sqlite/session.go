@@ -55,7 +55,7 @@ func (s *Store) Replace(id string, session domain.Session) error {
 	defer tx.Rollback()
 	for _, table := range []string{
 		"exact_members", "exact_recommendations", "exact_trash",
-		"similar_members", "decisions", "moves", "skipped",
+		"similar_members", "decisions", "moves", "skipped", "session_files",
 	} {
 		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE session_id = ?`, id); err != nil {
 			return err
@@ -106,6 +106,10 @@ func (s *Store) Load(id string) (domain.Session, error) {
 	if err != nil {
 		return domain.Session{}, err
 	}
+	session.Files, err = loadFiles(s.db, id)
+	if err != nil {
+		return domain.Session{}, err
+	}
 	return domain.RestoreSession(session, domain.SessionStatus(status))
 }
 
@@ -144,6 +148,17 @@ func writeSessionBody(tx *sql.Tx, id string, session domain.Session) error {
 		if _, err := tx.Exec(
 			`INSERT INTO skipped (session_id, skip_no, path, reason, target) VALUES (?, ?, ?, ?, ?)`,
 			id, i, skipped.Path, string(skipped.Reason), skipped.Target,
+		); err != nil {
+			return err
+		}
+	}
+	for _, file := range session.Files {
+		if _, err := tx.Exec(`
+INSERT INTO session_files
+  (session_id, file_id, path, size, mod_time, content_id, readable)
+VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			id, file.ID, file.File.Path, file.File.Size, file.File.ModTime.UnixNano(),
+			string(file.File.ContentID), boolInt(file.File.Readable),
 		); err != nil {
 			return err
 		}
@@ -443,4 +458,33 @@ ORDER BY skip_no`, id)
 		skipped = append(skipped, item)
 	}
 	return skipped, rows.Err()
+}
+
+func loadFiles(db *sql.DB, id string) ([]domain.SessionFile, error) {
+	rows, err := db.Query(`
+SELECT file_id, path, size, mod_time, content_id, readable
+FROM session_files
+WHERE session_id = ?
+ORDER BY file_id`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var files []domain.SessionFile
+	for rows.Next() {
+		var (
+			item     domain.SessionFile
+			mod      int64
+			content  string
+			readable int
+		)
+		if err := rows.Scan(&item.ID, &item.File.Path, &item.File.Size, &mod, &content, &readable); err != nil {
+			return nil, err
+		}
+		item.File.ContentID = domain.ContentID(content)
+		item.File.ModTime = time.Unix(0, mod)
+		item.File.Readable = readable != 0
+		files = append(files, item)
+	}
+	return files, rows.Err()
 }

@@ -8,7 +8,9 @@ import (
 	"os"
 
 	"github.com/cionz0/hdsort/internal/adapters/filesystem"
+	"github.com/cionz0/hdsort/internal/adapters/hash"
 	httpadapter "github.com/cionz0/hdsort/internal/adapters/http"
+	"github.com/cionz0/hdsort/internal/adapters/similar"
 	"github.com/cionz0/hdsort/internal/adapters/sqlite"
 	"github.com/cionz0/hdsort/internal/adapters/trash"
 )
@@ -38,7 +40,8 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	server := httpadapter.New(token, store, store, trasher, filesystem.NewOpener())
+	server := httpadapter.New(token, store, store, trasher, filesystem.NewOpener()).
+		WithScan(filesystem.NewWalker(nil), filesystem.NewOpener(), hash.New(), similar.New(), filesystem.NewSystemPicker())
 	url := fmt.Sprintf("http://%s/?token=%s", ln.Addr().String(), token)
 	fmt.Println(url)
 	go openBrowser(url)

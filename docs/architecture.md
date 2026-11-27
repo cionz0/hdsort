@@ -245,7 +245,7 @@ All routes require the capability token, in the cookie `hdsort_token` or in `Aut
 | `POST /scans/{id}/decisions` | Records keep, delete, or skip for one path (`path` and `choice`), or confirms one layout move (`moveFrom`). Sending both or neither is 400. |
 | `POST /scans/{id}/dry-run` | UC-7. Returns the plan report and writes nothing. A form POST returns the review page with the report and the sentence “Nothing was changed.” `Accept: application/json` returns the same report as JSON with `changed: false`. Validation failure is the same rejection as apply. |
 | `POST /scans/{id}/apply` | Runs apply. Returns the unapplied session with the error if Trash or validation fails. |
-| `GET /scans/{id}/files/{fileID}/preview` | Bytes of a file that belongs to that session. |
+| `GET /scans/{id}/files/{fileID}/preview` | Bytes of a file that belongs to that session, looked up by the opaque file id. A `path` query or a body `path` is 400. An id from another session is 404. JPEG, PNG, and GIF at most 1 MiB are returned unchanged. Larger images of those types are a JPEG no wider than 320 pixels. Any other type at most 1 MiB is returned with `Content-Disposition: attachment`. A larger non-image is 415. |
 
 A query or body that contains a filesystem path where a file id is required is a 400. An unknown file id is a 404. A missing token is a 401.
 

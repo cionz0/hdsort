@@ -32,6 +32,14 @@ type Walker interface {
 	Walk(root, dataDir string) ([]FileEntry, error)
 }
 
+// FolderPicker asks the operating system for a directory.
+// The scan calls it when the request does not name a path.
+//
+// Pattern: Ports and Adapters (Cockburn, 2005). See docs/patterns.md.
+type FolderPicker interface {
+	Pick() (string, error)
+}
+
 // FileReader opens a file for hashing. Tests wrap it to count bytes read.
 type FileReader interface {
 	Open(path string) (io.ReadSeekCloser, error)

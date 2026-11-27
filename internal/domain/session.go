@@ -41,6 +41,7 @@ type Session struct {
 	Decisions []Decision
 	Moves     []LayoutMove
 	Skipped   []Skipped
+	Files     []SessionFile
 	ExactOnly bool
 
 	status SessionStatus

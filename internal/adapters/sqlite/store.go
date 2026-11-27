@@ -97,6 +97,17 @@ CREATE TABLE IF NOT EXISTS skipped (
   target TEXT NOT NULL,
   PRIMARY KEY (session_id, skip_no)
 );
+
+CREATE TABLE IF NOT EXISTS session_files (
+  session_id TEXT NOT NULL,
+  file_id TEXT NOT NULL,
+  path TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  mod_time INTEGER NOT NULL,
+  content_id TEXT NOT NULL,
+  readable INTEGER NOT NULL,
+  PRIMARY KEY (session_id, file_id)
+);
 `
 
 // Store is the SQLite library and session repository.

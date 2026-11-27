@@ -16,6 +16,12 @@ var reviewTemplate = template.Must(template.New("review").Parse(`<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><title>hdsort</title></head>
 <body>
+{{if .Start}}
+<form id="start-scan" method="post" action="/scans">
+<label><input type="checkbox" name="exactOnly" value="true"> Exact duplicates only</label>
+<button type="submit">Scan</button>
+</form>
+{{end}}
 {{if .Banner}}<p id="sync-banner">{{.Banner}}</p>{{end}}
 <section id="exact">
 <h2>Exact duplicates</h2>
@@ -49,6 +55,7 @@ var reviewTemplate = template.Must(template.New("review").Parse(`<!DOCTYPE html>
 
 type reviewPage struct {
 	ID      string
+	Start   bool
 	Banner  string
 	Exact   []pageExact
 	Similar []pageSimilar
@@ -72,7 +79,7 @@ type pageMember struct {
 }
 
 func (s *Server) writeReview(w nethttp.ResponseWriter, status int, id string, session domain.Session, report *app.PlanReport) {
-	page := reviewPage{ID: id, Report: report}
+	page := reviewPage{ID: id, Start: id == "", Report: report}
 	if syncedRoot(session.Root) {
 		page.Banner = bannerText
 	}

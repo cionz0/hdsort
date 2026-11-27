@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	nethttp "net/http"
 	"path/filepath"
 	"strings"
@@ -19,6 +20,11 @@ type Server struct {
 	library  app.LibraryRepository
 	trash    app.Trasher
 	disk     app.Relocator
+	walk     app.Walker
+	read     app.FileReader
+	identify app.Identifier
+	similar  app.Similarizer
+	pick     app.FolderPicker
 	mux      *nethttp.ServeMux
 }
 
@@ -33,10 +39,23 @@ func New(token string, sessions app.SessionRepository, library app.LibraryReposi
 		mux:      nethttp.NewServeMux(),
 	}
 	s.mux.HandleFunc("GET /{$}", s.home)
+	s.mux.HandleFunc("POST /scans", s.postScan)
 	s.mux.HandleFunc("GET /scans/{id}", s.getSession)
+	s.mux.HandleFunc("GET /scans/{id}/files/{fileID}/preview", s.preview)
 	s.mux.HandleFunc("POST /scans/{id}/decisions", s.postDecision)
 	s.mux.HandleFunc("POST /scans/{id}/dry-run", s.dryRun)
 	s.mux.HandleFunc("POST /scans/{id}/apply", s.apply)
+	return s
+}
+
+// WithScan wires the ports POST /scans and preview call.
+// pick is the folder dialog. Tests pass a fake. cmd/hdsort passes the native dialog.
+func (s *Server) WithScan(walk app.Walker, read app.FileReader, identify app.Identifier, similar app.Similarizer, pick app.FolderPicker) *Server {
+	s.walk = walk
+	s.read = read
+	s.identify = identify
+	s.similar = similar
+	s.pick = pick
 	return s
 }
 
@@ -105,6 +124,65 @@ func (s *Server) home(w nethttp.ResponseWriter, r *nethttp.Request) {
 		return
 	}
 	s.writeReview(w, nethttp.StatusOK, id, session, nil)
+}
+
+type scanBody struct {
+	Path      string `json:"path"`
+	ExactOnly bool   `json:"exactOnly"`
+}
+
+func (s *Server) postScan(w nethttp.ResponseWriter, r *nethttp.Request) {
+	if s.walk == nil || s.read == nil || s.identify == nil || s.similar == nil || s.pick == nil {
+		nethttp.Error(w, "scan is not configured", nethttp.StatusInternalServerError)
+		return
+	}
+	body, err := decodeScan(r)
+	if err != nil {
+		nethttp.Error(w, "bad scan", nethttp.StatusBadRequest)
+		return
+	}
+	root := body.Path
+	if root == "" {
+		root, err = s.pick.Pick()
+		if err != nil {
+			nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+			return
+		}
+	}
+	result, err := app.Scan(root, "", s.walk, s.read, s.identify, s.similar, body.ExactOnly)
+	if err != nil {
+		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+		return
+	}
+	session, err := app.AttachFiles(result.Session, result.Files)
+	if err != nil {
+		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		return
+	}
+	id, err := s.sessions.Save(session)
+	if err != nil {
+		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, nethttp.StatusOK, sessionJSON(id, session))
+}
+
+func decodeScan(r *nethttp.Request) (scanBody, error) {
+	if r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
+		if err := r.ParseForm(); err != nil {
+			return scanBody{}, err
+		}
+		return scanBody{
+			Path:      r.PostForm.Get("path"),
+			ExactOnly: r.PostForm.Get("exactOnly") == "true",
+		}, nil
+	}
+	var body scanBody
+	err := json.NewDecoder(r.Body).Decode(&body)
+	if errors.Is(err, io.EOF) {
+		return scanBody{}, nil
+	}
+	return body, err
 }
 
 func (s *Server) getSession(w nethttp.ResponseWriter, r *nethttp.Request) {
@@ -251,9 +329,11 @@ type sessionView struct {
 	ID        string         `json:"id"`
 	Root      string         `json:"root"`
 	Status    string         `json:"status"`
+	ExactOnly bool           `json:"exactOnly"`
 	Exact     []exactView    `json:"exact"`
 	Similar   []similarView  `json:"similar"`
 	Decisions []decisionView `json:"decisions"`
+	Files     []fileView     `json:"files"`
 }
 
 type exactView struct {
@@ -282,11 +362,17 @@ type decisionView struct {
 	Choice string `json:"choice"`
 }
 
+type fileView struct {
+	ID   string `json:"id"`
+	Path string `json:"path"`
+}
+
 func sessionJSON(id string, session domain.Session) sessionView {
 	view := sessionView{
-		ID:     id,
-		Root:   session.Root,
-		Status: string(session.Status()),
+		ID:        id,
+		Root:      session.Root,
+		Status:    string(session.Status()),
+		ExactOnly: session.ExactOnly,
 	}
 	for _, group := range session.Exact {
 		item := exactView{Members: membersOf(group.Members())}
@@ -306,6 +392,9 @@ func sessionJSON(id string, session domain.Session) sessionView {
 	for _, decision := range session.Decisions {
 		view.Decisions = append(view.Decisions, decisionView{Path: decision.Path, Choice: string(decision.Choice)})
 	}
+	for _, file := range session.Files {
+		view.Files = append(view.Files, fileView{ID: file.ID, Path: file.File.Path})
+	}
 	if view.Exact == nil {
 		view.Exact = []exactView{}
 	}
@@ -314,6 +403,9 @@ func sessionJSON(id string, session domain.Session) sessionView {
 	}
 	if view.Decisions == nil {
 		view.Decisions = []decisionView{}
+	}
+	if view.Files == nil {
+		view.Files = []fileView{}
 	}
 	return view
 }

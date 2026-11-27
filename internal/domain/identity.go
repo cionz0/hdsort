@@ -16,7 +16,13 @@ type FileRef struct {
 	Readable  bool
 }
 
-// LibraryEntry is a survivor already recorded for a content ID.
+// SessionFile is one readable file from a scan, addressed by an opaque id.
+// Preview requests use ID. They do not send Path.
+type SessionFile struct {
+	ID   string
+	File FileRef
+}
+
 // Size and ModTime are the file metadata last reconciled.
 // Stale means the file is missing or its content ID changed; a stale entry
 // is not a survivor.
