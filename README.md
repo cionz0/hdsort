@@ -34,7 +34,7 @@ go build -o hdsort ./cmd/hdsort
 
 ## Install a release
 
-Release tags follow [Semantic Versioning 2.0.0](https://semver.org/): `vMAJOR.MINOR.PATCH`, with an optional pre-release suffix `-alpha.N`, `-beta.N`, or `-rc.N`. Pushing that tag is the only version step. GitHub Actions writes the tag into the binary and attaches one archive per target to the [GitHub Release](https://github.com/cionz0/hdsort/releases). A local checkout does not change `v0.0.0`, and the next number is the next tag you push.
+Release tags follow [Semantic Versioning 2.0.0](https://semver.org/): `vMAJOR.MINOR.PATCH`, with an optional pre-release suffix `-alpha.N`, `-beta.N`, or `-rc.N`. Pushing that tag is the only version step. GitHub Actions builds each archive with cgo on a runner of that operating system, writes the tag into the binary, and attaches the archives to the [GitHub Release](https://github.com/cionz0/hdsort/releases). A local checkout does not change `v0.0.0`, and the next number is the next tag you push.
 
 Download the archive for the machine and open it. Go is not required. On macOS, open `hdsort.app`: Finder shows its icon. On Windows, `hdsort_windows_amd64.exe` carries the same icon. On Linux, the archive also contains `hdsort.png` and `hdsort.desktop`; the file manager shows that icon after the desktop entry is installed.
 
@@ -50,7 +50,7 @@ The binary talks only to folders on that computer. It is not a cloud service.
 
 ## Status
 
-Prompts 01 through 11 are done.
+Prompts 01 through 11 are done. Next session: [`prompts/12-native-window.md`](prompts/12-native-window.md).
 
 ## License
 

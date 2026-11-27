@@ -15,3 +15,4 @@ Format: Michael Nygard, “Documenting Architecture Decisions,” 2011. <https:/
 | [0009](0009-dry-run-on-the-review-page.md) | Dry-run is a review-page action | Accepted |
 | [0010](0010-similarity-algorithms.md) | Similarity algorithms | Accepted |
 | [0011](0011-exact-only-scan-mode.md) | Exact-only is a scan mode | Accepted |
+| [0012](0012-release-builds-enable-cgo.md) | Release builds enable cgo on the target operating system | Accepted |

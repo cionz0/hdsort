@@ -17,7 +17,7 @@ The user opens a capability URL `http://127.0.0.1:<port>/?token=<secret>`. The s
 
 Choosing a folder is a port implemented by a native folder dialog in the process. The page asks the process to open the dialog. Tests supply a fake dialog that returns a fixture path.
 
-GitHub Actions builds the Release with `CGO_ENABLED=0`. Release tags follow Semantic Versioning 2.0.0.
+Release tags follow Semantic Versioning 2.0.0. The release build enables cgo and runs on the target operating system (ADR-0012).
 
 ## Consequences
 

@@ -1,5 +1,6 @@
-# Release builds one CGO_ENABLED=0 archive per target and attaches it to a
-# GitHub Release. The tag is the version (-ldflags -X main.version=<tag>).
+# Release builds one CGO_ENABLED=1 archive per target and attaches it to a
+# GitHub Release. Each archive is built on a runner of its own OS (ADR-0012).
+# The tag is the version (-ldflags -X main.version=<tag>).
 #
 # Trigger (GitHub filter patterns, not regex): a full SemVer tag
 # vMAJOR.MINOR.PATCH, or the same tag with -alpha.N, -beta.N, or -rc.N.
@@ -18,49 +19,90 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
+  archive:
+    name: ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            goos: darwin
+            goarch: arm64
+          - runner: macos-latest
+            goos: darwin
+            goarch: amd64
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - runner: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+          - runner: windows-latest
+            goos: windows
+            goarch: amd64
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
+      - name: Install a C compiler
+        if: matrix.goos == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential
       - uses: actions/setup-go@v5
         with:
           go-version: "1.27.4"
-      - name: Build archives
+      - name: Build archive
         env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "1"
           VERSION: ${{ github.ref_name }}
         run: |
           set -eu
-          root="$PWD"
-          for spec in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64; do
-            goos="${spec%/*}"
-            goarch="${spec#*/}"
-            name="hdsort_${goos}_${goarch}"
-            stage="$(mktemp -d)"
-            bin="$name"
-            if [ "$goos" = "windows" ]; then
-              bin="${name}.exe"
-            fi
-            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
-              go build -ldflags "-X main.version=${VERSION}" -o "$stage/$bin" ./cmd/hdsort
-            if [ "$goos" = "darwin" ]; then
-              app="$stage/hdsort.app/Contents"
-              mkdir -p "$app/MacOS" "$app/Resources"
-              mv "$stage/$bin" "$app/MacOS/hdsort"
-              chmod +x "$app/MacOS/hdsort"
-              cp assets/icon/icon.icns "$app/Resources/hdsort.icns"
-              sed "s/__VERSION__/${VERSION#v}/g" assets/icon/Info.plist > "$app/Info.plist"
-              tar -czf "$root/${name}.tar.gz" -C "$stage" hdsort.app
-            elif [ "$goos" = "windows" ]; then
-              # The icon is linked from cmd/hdsort/rsrc_windows_amd64.syso.
-              (cd "$stage" && zip "$root/${name}.zip" "$bin")
-            else
-              cp assets/icon/icon.png "$stage/hdsort.png"
-              sed "s/^Exec=.*/Exec=${bin}/" assets/icon/hdsort.desktop > "$stage/hdsort.desktop"
-              tar -czf "$root/${name}.tar.gz" -C "$stage" "$bin" hdsort.png hdsort.desktop
-            fi
-            rm -rf "$stage"
-          done
+          if [ "$GOOS" = "darwin" ] && [ "$GOARCH" = "amd64" ]; then
+            CC="clang -arch x86_64"
+            export CC
+          fi
+          name="hdsort_${GOOS}_${GOARCH}"
+          stage="$(mktemp -d)"
+          bin="$name"
+          if [ "$GOOS" = "windows" ]; then
+            bin="${name}.exe"
+          fi
+          go build -ldflags "-X main.version=${VERSION}" -o "$stage/$bin" ./cmd/hdsort
+          if [ "$GOOS" = "darwin" ]; then
+            app="$stage/hdsort.app/Contents"
+            mkdir -p "$app/MacOS" "$app/Resources"
+            mv "$stage/$bin" "$app/MacOS/hdsort"
+            chmod +x "$app/MacOS/hdsort"
+            cp assets/icon/icon.icns "$app/Resources/hdsort.icns"
+            sed "s/__VERSION__/${VERSION#v}/g" assets/icon/Info.plist > "$app/Info.plist"
+            tar -czf "${name}.tar.gz" -C "$stage" hdsort.app
+          elif [ "$GOOS" = "windows" ]; then
+            # The icon is linked from cmd/hdsort/rsrc_windows_amd64.syso.
+            STAGE_DIR="$stage" ARCHIVE_BASE="$PWD/$name" python -c 'import os, shutil; shutil.make_archive(os.environ["ARCHIVE_BASE"], "zip", os.environ["STAGE_DIR"])'
+          else
+            cp assets/icon/icon.png "$stage/hdsort.png"
+            sed "s/^Exec=.*/Exec=${bin}/" assets/icon/hdsort.desktop > "$stage/hdsort.desktop"
+            tar -czf "${name}.tar.gz" -C "$stage" "$bin" hdsort.png hdsort.desktop
+          fi
+          rm -rf "$stage"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.goos }}-${{ matrix.goarch }}
+          path: hdsort_${{ matrix.goos }}_${{ matrix.goarch }}.*
+          if-no-files-found: error
+
+  publish:
+    needs: archive
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
       - name: Publish the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" hdsort_*.tar.gz hdsort_*.zip --title "${{ github.ref_name }}" --generate-notes
+        run: gh release create "${{ github.ref_name }}" dist/hdsort_*.tar.gz dist/hdsort_*.zip --title "${{ github.ref_name }}" --generate-notes
