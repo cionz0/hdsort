@@ -5,6 +5,8 @@ package trash
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/cionz0/hdsort/internal/app"
 )
 
 // NewPlatform returns the Freedesktop adapter for the home Trash directory.
@@ -22,3 +24,6 @@ func NewPlatform() (*Freedesktop, error) {
 	}
 	return NewFreedesktop(filepath.Join(base, "Trash")), nil
 }
+
+// System returns the Freedesktop adapter for the home Trash directory.
+func System() (app.Trasher, error) { return NewPlatform() }

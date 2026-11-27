@@ -1,10 +1,14 @@
 package app
 
 import (
+	"errors"
 	"time"
 
 	"github.com/cionz0/hdsort/internal/domain"
 )
+
+// ErrSessionNotFound is returned when a session id is not in the repository.
+var ErrSessionNotFound = errors.New("session not found")
 
 // LibraryRepository is the survivor collection.
 //
@@ -20,6 +24,7 @@ type LibraryRepository interface {
 type SessionRepository interface {
 	Save(session domain.Session) (id string, err error)
 	Load(id string) (domain.Session, error)
+	Replace(id string, session domain.Session) error
 }
 
 // FileFacts is the metadata reconcile reads for one path.

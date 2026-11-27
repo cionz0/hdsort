@@ -2,7 +2,7 @@
 
 hdsort is a local program that scans a folder, finds duplicate files, asks the user before deleting anything, and records the files they kept. Later scans compare new folders with that record.
 
-The skeleton, the domain model, content identity, the keeper policy, the SQLite library, apply, and similar groups exist. Review is what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
+The skeleton, the domain model, content identity, the keeper policy, the SQLite library, apply, similar groups, and the loopback review page exist. Starting a scan from the page is what the remaining prompts in `prompts/` build. Decisions are in `docs/adr/`. Patterns are the ones cited in `docs/patterns.md`.
 
 ## System context
 
@@ -223,10 +223,10 @@ All routes require the capability token, in the cookie `hdsort_token` or in `Aut
 
 | Method and path | Behavior |
 | --- | --- |
-| `GET /?token=` | Sets the cookie and returns the review page. |
+| `GET /?token=&scan=` | Sets the cookie and returns the review page for that session. Without `scan`, the page has empty sections and no Dry run or Apply controls. |
 | `POST /scans` | Body is a folder path, or an empty body that triggers the folder-dialog port. Starts a scan and returns a session id. |
 | `GET /scans/{id}` | Session: groups, recommendations, decisions, skips, layout proposals. |
-| `POST /scans/{id}/decisions` | Records keep, delete, or skip for one file id, or confirms one layout move. |
+| `POST /scans/{id}/decisions` | Records keep, delete, or skip for one path (`path` and `choice`), or confirms one layout move (`moveFrom`). Sending both or neither is 400. |
 | `POST /scans/{id}/dry-run` | UC-7. Returns the plan report and writes nothing. A form POST returns the review page with the report and the sentence “Nothing was changed.” `Accept: application/json` returns the same report as JSON with `changed: false`. Validation failure is the same rejection as apply. |
 | `POST /scans/{id}/apply` | Runs apply. Returns the unapplied session with the error if Trash or validation fails. |
 | `GET /scans/{id}/files/{fileID}/preview` | Bytes of a file that belongs to that session. |

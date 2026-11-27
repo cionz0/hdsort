@@ -4,7 +4,7 @@ hdsort scans a folder on your machine, finds duplicate files, and asks you befor
 
 The review UI is a page served by the program on `127.0.0.1`. From that page the owner can dry-run the current decisions and see what would change; a dry-run writes nothing. The files never leave the computer. Cloud copies are included only when a sync client has already stored them in a local folder.
 
-This repository is the specification and the build plan. The module, package tree, version command, domain model, content-identity scan, keeper policy, SQLite library, apply, and similar groups exist. The review page is still ahead. Each file in [`prompts/`](prompts/) is one implementation session, in the order listed in [`docs/development-plan.md`](docs/development-plan.md).
+This repository is the specification and the build plan. The module, package tree, version command, domain model, content-identity scan, keeper policy, SQLite library, apply, similar groups, and the loopback review page exist. Each file in [`prompts/`](prompts/) is one implementation session, in the order listed in [`docs/development-plan.md`](docs/development-plan.md).
 
 ## Documentation
 
@@ -30,11 +30,11 @@ go build -o hdsort ./cmd/hdsort
 ./hdsort
 ```
 
-`./hdsort` prints `hdsort v0.0.0`. A release build replaces that string with `-ldflags "-X main.version=vX.Y.Z"`. Prompt 10 adds the Release binaries for macOS, Linux, and Windows. A Release binary does not require a Go installation.
+`./hdsort` listens on `127.0.0.1` with an ephemeral port and prints the capability URL, `http://127.0.0.1:<port>/?token=<secret>`. It then opens that URL in the system browser. The embedded version stays `v0.0.0` until a release build replaces it with `-ldflags "-X main.version=vX.Y.Z"`. Prompt 10 adds the Release binaries for macOS, Linux, and Windows. A Release binary does not require a Go installation.
 
 ## Status
 
-Prompts 01 through 07 are done. Next session: [`prompts/08-loopback-review.md`](prompts/08-loopback-review.md).
+Prompts 01 through 08 are done. Next session: [`prompts/09-scan-and-preview.md`](prompts/09-scan-and-preview.md).
 
 ## License
 

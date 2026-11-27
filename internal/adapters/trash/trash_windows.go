@@ -41,6 +41,9 @@ type Platform struct{}
 // NewPlatform returns the Windows Trash adapter.
 func NewPlatform() Platform { return Platform{} }
 
+// System returns the Windows Recycle Bin adapter.
+func System() (app.Trasher, error) { return NewPlatform(), nil }
+
 // Trash deletes path with FOF_ALLOWUNDO, which sends it to the Recycle Bin.
 // An empty path is rejected before the API call. The file is not unlinked.
 func (Platform) Trash(path string) error {

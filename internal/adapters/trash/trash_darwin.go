@@ -18,6 +18,9 @@ type Platform struct{}
 // NewPlatform returns the macOS Trash adapter.
 func NewPlatform() Platform { return Platform{} }
 
+// System returns the macOS Trash adapter. Calling Trash asks Finder.
+func System() (app.Trasher, error) { return NewPlatform(), nil }
+
 // Trash asks Finder to move path to the Trash. An empty path is rejected
 // before Finder is started.
 func (Platform) Trash(path string) error {

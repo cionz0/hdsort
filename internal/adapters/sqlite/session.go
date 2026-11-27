@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cionz0/hdsort/internal/app"
 	"github.com/cionz0/hdsort/internal/domain"
 )
 
@@ -29,35 +30,8 @@ func (s *Store) Save(session domain.Session) (string, error) {
 	); err != nil {
 		return "", err
 	}
-	if err := insertExact(tx, id, session.Exact); err != nil {
+	if err := writeSessionBody(tx, id, session); err != nil {
 		return "", err
-	}
-	if err := insertSimilar(tx, id, session.Similar); err != nil {
-		return "", err
-	}
-	for i, decision := range session.Decisions {
-		if _, err := tx.Exec(
-			`INSERT INTO decisions (session_id, decision_no, path, choice) VALUES (?, ?, ?, ?)`,
-			id, i, decision.Path, string(decision.Choice),
-		); err != nil {
-			return "", err
-		}
-	}
-	for i, move := range session.Moves {
-		if _, err := tx.Exec(
-			`INSERT INTO moves (session_id, move_no, from_path, destination, confirmed) VALUES (?, ?, ?, ?, ?)`,
-			id, i, move.From, move.Destination, boolInt(move.Confirmed),
-		); err != nil {
-			return "", err
-		}
-	}
-	for i, skipped := range session.Skipped {
-		if _, err := tx.Exec(
-			`INSERT INTO skipped (session_id, skip_no, path, reason, target) VALUES (?, ?, ?, ?, ?)`,
-			id, i, skipped.Path, string(skipped.Reason), skipped.Target,
-		); err != nil {
-			return "", err
-		}
 	}
 	if err := tx.Commit(); err != nil {
 		return "", err
@@ -65,12 +39,46 @@ func (s *Store) Save(session domain.Session) (string, error) {
 	return id, nil
 }
 
+// Replace writes session back under an id that Save already returned.
+func (s *Store) Replace(id string, session domain.Session) error {
+	var exists int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE id = ?`, id).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 0 {
+		return fmt.Errorf("sqlite: session %s: %w", id, app.ErrSessionNotFound)
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, table := range []string{
+		"exact_members", "exact_recommendations", "exact_trash",
+		"similar_members", "decisions", "moves", "skipped",
+	} {
+		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE session_id = ?`, id); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(
+		`UPDATE sessions SET root = ?, status = ? WHERE id = ?`,
+		session.Root, string(session.Status()), id,
+	); err != nil {
+		return err
+	}
+	if err := writeSessionBody(tx, id, session); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // Load rebuilds a session saved by Save.
 func (s *Store) Load(id string) (domain.Session, error) {
 	var root, status string
 	err := s.db.QueryRow(`SELECT root, status FROM sessions WHERE id = ?`, id).Scan(&root, &status)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Session{}, fmt.Errorf("sqlite: session %s: %w", id, err)
+		return domain.Session{}, fmt.Errorf("sqlite: session %s: %w", id, app.ErrSessionNotFound)
 	}
 	if err != nil {
 		return domain.Session{}, err
@@ -105,6 +113,40 @@ func newID() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(buf[:]), nil
+}
+
+func writeSessionBody(tx *sql.Tx, id string, session domain.Session) error {
+	if err := insertExact(tx, id, session.Exact); err != nil {
+		return err
+	}
+	if err := insertSimilar(tx, id, session.Similar); err != nil {
+		return err
+	}
+	for i, decision := range session.Decisions {
+		if _, err := tx.Exec(
+			`INSERT INTO decisions (session_id, decision_no, path, choice) VALUES (?, ?, ?, ?)`,
+			id, i, decision.Path, string(decision.Choice),
+		); err != nil {
+			return err
+		}
+	}
+	for i, move := range session.Moves {
+		if _, err := tx.Exec(
+			`INSERT INTO moves (session_id, move_no, from_path, destination, confirmed) VALUES (?, ?, ?, ?, ?)`,
+			id, i, move.From, move.Destination, boolInt(move.Confirmed),
+		); err != nil {
+			return err
+		}
+	}
+	for i, skipped := range session.Skipped {
+		if _, err := tx.Exec(
+			`INSERT INTO skipped (session_id, skip_no, path, reason, target) VALUES (?, ?, ?, ?, ?)`,
+			id, i, skipped.Path, string(skipped.Reason), skipped.Target,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func insertExact(tx *sql.Tx, id string, groups []domain.ExactGroup) error {
