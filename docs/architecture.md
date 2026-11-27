@@ -36,7 +36,7 @@ flowchart LR
   process --> trash
 ```
 
-The process binds `127.0.0.1` or `::1` (ADR-0002). It opens the capability URL in the system browser. Release builds are one `CGO_ENABLED=0` binary per OS/architecture.
+The process binds `127.0.0.1` or `::1` (ADR-0002). It opens the capability URL in the system browser. A tag `vMAJOR.MINOR.PATCH` builds one `CGO_ENABLED=0` binary for each of `darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`, and `windows/amd64`, and the binary’s version is that tag.
 
 ## Components
 

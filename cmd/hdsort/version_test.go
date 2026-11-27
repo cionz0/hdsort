@@ -12,6 +12,15 @@ func TestAcceptance_VersionDefault(t *testing.T) {
 	}
 }
 
+func TestAcceptance_VersionFromLdflags(t *testing.T) {
+	previous := version
+	t.Cleanup(func() { version = previous })
+	version = "v1.2.3"
+	if got := Version(); got != "v1.2.3" {
+		t.Fatalf("Version() = %q, want the ldflags value", got)
+	}
+}
+
 func TestAcceptance_WorkflowMatrix(t *testing.T) {
 	body, err := os.ReadFile("../../.github/workflows/test.yml")
 	if err != nil {

@@ -1,0 +1,52 @@
+# Release builds one CGO_ENABLED=0 archive per target and attaches it to a
+# GitHub Release. The tag is the version (-ldflags -X main.version=<tag>).
+#
+# Trigger (GitHub filter patterns, not regex): a full SemVer tag
+# vMAJOR.MINOR.PATCH, or the same tag with -alpha.N, -beta.N, or -rc.N.
+# A tag missing a segment, such as v1.2, does not match and does not run.
+name: release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-alpha.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.4"
+      - name: Build archives
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -eu
+          for spec in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64; do
+            goos="${spec%/*}"
+            goarch="${spec#*/}"
+            name="hdsort_${goos}_${goarch}"
+            bin="$name"
+            if [ "$goos" = "windows" ]; then
+              bin="${name}.exe"
+            fi
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+              go build -ldflags "-X main.version=${VERSION}" -o "$bin" ./cmd/hdsort
+            if [ "$goos" = "windows" ]; then
+              zip "${name}.zip" "$bin"
+            else
+              tar -czf "${name}.tar.gz" "$bin"
+            fi
+          done
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" hdsort_*.tar.gz hdsort_*.zip --title "${{ github.ref_name }}" --generate-notes
