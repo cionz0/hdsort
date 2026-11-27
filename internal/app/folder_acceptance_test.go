@@ -1,0 +1,279 @@
+package app_test
+
+import (
+	"image/color"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/cionz0/hdsort/internal/adapters/filesystem"
+	"github.com/cionz0/hdsort/internal/adapters/hash"
+	"github.com/cionz0/hdsort/internal/adapters/similar"
+	"github.com/cionz0/hdsort/internal/app"
+	"github.com/cionz0/hdsort/internal/domain"
+)
+
+func TestAcceptance_ReviewListsOneRowPerSetUnderItsFolder(t *testing.T) {
+	root := t.TempDir()
+	photos := filepath.Join(root, "photos")
+	other := filepath.Join(root, "other")
+	if err := os.MkdirAll(photos, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(other, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	img := solidPNG(color.NRGBA{R: 20, G: 80, B: 40, A: 255})
+	keeper := filepath.Join(photos, "photo.png")
+	writePNG(t, keeper, img)
+	writePNG(t, filepath.Join(photos, "photo (1).png"), img)
+	copy := filepath.Join(other, "Copy of photo.png")
+	writePNG(t, copy, img)
+
+	var board app.FolderBoard
+	result, err := app.Scan(root, "", filesystem.NewWalker(nil), filesystem.NewOpener(), hash.New(), similar.New(), true, func(ev app.ProgressEvent) {
+		board.Apply(ev)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	board.UseReview(app.Review(result.Session, nil))
+
+	if board.Contains(keeper) != 1 {
+		t.Fatalf("keeper rows = %d, want 1", board.Contains(keeper))
+	}
+	if board.Contains(copy) != 1 {
+		t.Fatalf("copy rows = %d, want 1", board.Contains(copy))
+	}
+	for _, row := range board.Rows {
+		for _, member := range row.Members {
+			if member.Path != keeper {
+				continue
+			}
+			if row.Folder != photos {
+				t.Fatalf("folder = %s, want %s", row.Folder, photos)
+			}
+			if row.Kind != app.RowExact {
+				t.Fatalf("kind = %s, want exact", row.Kind)
+			}
+			if len(row.Members) != 3 {
+				t.Fatalf("members = %d, want 3", len(row.Members))
+			}
+		}
+	}
+}
+
+func TestAcceptance_ScanStatusStaysOnTheSameRow(t *testing.T) {
+	const path = "/scans/budget.pdf"
+	var board app.FolderBoard
+	board.Apply(app.ProgressEvent{Kind: app.EventQueue, Path: path, Size: 180})
+	board.Apply(app.ProgressEvent{Kind: app.EventHashing, Path: path, Size: 180, Stage: app.StageFull})
+	if len(board.Rows) != 1 {
+		t.Fatalf("rows = %d, want 1", len(board.Rows))
+	}
+	row := board.Rows[0]
+	if row.Status != "reading" || row.Stage != app.StageFull || row.Size != 180 {
+		t.Fatalf("row = %+v", row)
+	}
+}
+
+func TestAcceptance_FolderOrderWalksOneDirectory(t *testing.T) {
+	root := t.TempDir()
+	session := domain.NewSession(root)
+	session.Exact = []domain.ExactGroup{
+		exactPair(t, filepath.Join(root, "beta", "three.txt"), filepath.Join(root, "beta", "three (1).txt"), "bbb"),
+		exactPair(t, filepath.Join(root, "alpha", "two.txt"), filepath.Join(root, "alpha", "two (1).txt"), "aaa"),
+		exactPair(t, filepath.Join(root, "alpha", "one.txt"), filepath.Join(root, "alpha", "one (1).txt"), "ccc"),
+	}
+	var board app.FolderBoard
+	board.UseReview(app.Review(session, nil))
+	if len(board.Rows) != 3 {
+		t.Fatalf("rows = %d, want 3", len(board.Rows))
+	}
+	alpha := filepath.Join(root, "alpha")
+	if board.Rows[0].Folder != alpha || board.Rows[1].Folder != alpha {
+		t.Fatalf("first folders = %s, %s", board.Rows[0].Folder, board.Rows[1].Folder)
+	}
+	if board.Rows[2].Folder != filepath.Join(root, "beta") {
+		t.Fatalf("last folder = %s", board.Rows[2].Folder)
+	}
+}
+
+func TestAcceptance_SkipSetSkipsEveryMember(t *testing.T) {
+	root := t.TempDir()
+	photos := filepath.Join(root, "photos")
+	paths := []string{
+		filepath.Join(photos, "photo.png"),
+		filepath.Join(photos, "photo (1).png"),
+		filepath.Join(root, "other", "Copy of photo.png"),
+	}
+	session := domain.NewSession(root)
+	next, err := app.SkipSet(session, paths)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(next.Decisions) != len(paths) {
+		t.Fatalf("decisions = %d, want %d", len(next.Decisions), len(paths))
+	}
+	for _, path := range paths {
+		choice := decisionFor(next, path)
+		if choice != domain.ChoiceSkip {
+			t.Fatalf("%s choice = %q", path, choice)
+		}
+	}
+}
+
+func TestAcceptance_ApplyFolderKeepsThatFolder(t *testing.T) {
+	root := t.TempDir()
+	photos := filepath.Join(root, "photos")
+	other := filepath.Join(root, "other")
+	if err := os.MkdirAll(photos, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(other, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	img := solidPNG(color.NRGBA{R: 10, G: 20, B: 30, A: 255})
+	keeper := filepath.Join(photos, "shot.png")
+	inside := filepath.Join(photos, "shot (1).png")
+	outside := filepath.Join(other, "Copy of shot.png")
+	writePNG(t, keeper, img)
+	writePNG(t, inside, img)
+	writePNG(t, outside, img)
+	writeFile(t, filepath.Join(photos, "note.txt"), []byte("same-note"))
+	writeFile(t, filepath.Join(photos, "note (1).txt"), []byte("same-note"))
+	near := solidPNG(color.NRGBA{R: 200, G: 30, B: 30, A: 255})
+	changed := cloneNRGBA(near)
+	changed.Set(3, 3, color.NRGBA{R: 201, G: 30, B: 30, A: 255})
+	nearA := filepath.Join(photos, "near-a.png")
+	nearB := filepath.Join(photos, "near-b.png")
+	writePNG(t, nearA, near)
+	writePNG(t, nearB, changed)
+
+	result, err := app.Scan(root, "", filesystem.NewWalker(nil), filesystem.NewOpener(), hash.New(), similar.New(), false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, err := app.ApplySameTypeInFolder(result.Session, photos, keeper)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decisionFor(next, keeper) != domain.ChoiceKeep || decisionFor(next, inside) != domain.ChoiceKeep {
+		t.Fatalf("photos copies = %q %q", decisionFor(next, keeper), decisionFor(next, inside))
+	}
+	if decisionFor(next, outside) != domain.ChoiceDelete {
+		t.Fatalf("other copy = %q", decisionFor(next, outside))
+	}
+	for _, path := range []string{
+		filepath.Join(photos, "note.txt"),
+		filepath.Join(photos, "note (1).txt"),
+		nearA,
+		nearB,
+	} {
+		if choice := decisionFor(next, path); choice != "" {
+			t.Fatalf("%s choice = %q, want none", path, choice)
+		}
+	}
+}
+
+func TestAcceptance_RunningActionDisablesItsControl(t *testing.T) {
+	var view app.ScanView
+	view.Apply(app.ProgressEvent{
+		Kind:  app.EventHashing,
+		Path:  "/docs/budget.pdf",
+		Size:  180,
+		Stage: app.StageFull,
+	})
+	reading := app.SlotFrom(view, "")
+	if reading.Label == "" || !strings.Contains(reading.Label, "/docs/budget.pdf") || !strings.Contains(reading.Label, "full") {
+		t.Fatalf("label = %q", reading.Label)
+	}
+	if !reading.StartDisabled || reading.DryDisabled || reading.ApplyDisabled {
+		t.Fatalf("reading disables = start %v dry %v apply %v", reading.StartDisabled, reading.DryDisabled, reading.ApplyDisabled)
+	}
+
+	trashing := app.SlotFrom(app.ScanView{}, "/backup/Copy of photo.png")
+	if !strings.Contains(trashing.Label, "/backup/Copy of photo.png") {
+		t.Fatalf("trash label = %q", trashing.Label)
+	}
+	if trashing.StartDisabled || trashing.DryDisabled || !trashing.ApplyDisabled {
+		t.Fatalf("trash disables = start %v dry %v apply %v", trashing.StartDisabled, trashing.DryDisabled, trashing.ApplyDisabled)
+	}
+}
+
+func TestAcceptance_SystemPaletteFollowsAppearance(t *testing.T) {
+	indigo := app.OptionalColor{Color: color.NRGBA{R: 0x3F, G: 0x51, B: 0xB5, A: 0xFF}, Set: true}
+	cases := []struct {
+		name       string
+		appearance app.Appearance
+		system     app.SystemColors
+		want       app.Palette
+	}{
+		{name: "light fallback", appearance: app.AppearanceLight, want: app.LightFallback},
+		{name: "dark fallback", appearance: app.AppearanceDark, want: app.DarkFallback},
+		{
+			name:       "system background keeps fallback primary",
+			appearance: app.AppearanceDark,
+			system: app.SystemColors{Background: app.OptionalColor{
+				Color: color.NRGBA{R: 1, G: 2, B: 3, A: 0xFF}, Set: true,
+			}},
+			want: app.Palette{
+				Background: color.NRGBA{R: 1, G: 2, B: 3, A: 0xFF},
+				Text:       app.DarkFallback.Text,
+				Primary:    app.DarkFallback.Primary,
+				OnPrimary:  app.DarkFallback.OnPrimary,
+			},
+		},
+		{
+			name:       "full system colors",
+			appearance: app.AppearanceLight,
+			system: app.SystemColors{
+				Background: app.OptionalColor{Color: color.NRGBA{R: 0x11, G: 0x22, B: 0x33, A: 0xFF}, Set: true},
+				Text:       app.OptionalColor{Color: color.NRGBA{R: 0x44, G: 0x55, B: 0x66, A: 0xFF}, Set: true},
+				Primary:    app.OptionalColor{Color: color.NRGBA{R: 0x77, G: 0x88, B: 0x99, A: 0xFF}, Set: true},
+				OnPrimary:  app.OptionalColor{Color: color.NRGBA{R: 0xAA, G: 0xBB, B: 0xCC, A: 0xFF}, Set: true},
+			},
+			want: app.Palette{
+				Background: color.NRGBA{R: 0x11, G: 0x22, B: 0x33, A: 0xFF},
+				Text:       color.NRGBA{R: 0x44, G: 0x55, B: 0x66, A: 0xFF},
+				Primary:    color.NRGBA{R: 0x77, G: 0x88, B: 0x99, A: 0xFF},
+				OnPrimary:  color.NRGBA{R: 0xAA, G: 0xBB, B: 0xCC, A: 0xFF},
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := app.ResolvePalette(tc.appearance, tc.system)
+			if got != tc.want {
+				t.Fatalf("palette = %+v, want %+v", got, tc.want)
+			}
+			if got.Primary == indigo.Color {
+				t.Fatalf("primary = indigo")
+			}
+		})
+	}
+}
+
+func exactPair(t *testing.T, plain, generated, id string) domain.ExactGroup {
+	t.Helper()
+	now := time.Unix(1_700_000_000, 0)
+	group, err := domain.NewExactGroup([]domain.FileRef{
+		{Path: plain, Size: 4, ModTime: now, ContentID: domain.ContentID(id), Readable: true},
+		{Path: generated, Size: 4, ModTime: now, ContentID: domain.ContentID(id), Readable: true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return group
+}
+
+func decisionFor(session domain.Session, path string) domain.Choice {
+	for _, decision := range session.Decisions {
+		if decision.Path == path {
+			return decision.Choice
+		}
+	}
+	return ""
+}

@@ -18,6 +18,7 @@ Status below is the source of truth for “what is next.” The session that fin
 | 10 | [prompts/10-scan-and-preview.md](../prompts/10-scan-and-preview.md) | done (`internal/adapters/http`) | Start a scan from the page, pass exactOnly, previews by file id |
 | 11 | [prompts/11-release-binaries.md](../prompts/11-release-binaries.md) | done (`cmd/hdsort`) | Cross-compiled GitHub Release binaries |
 | 12 | [prompts/12-native-window.md](../prompts/12-native-window.md) | done (`internal/app`) | Native window, scan progress, thumbnails, keeper and sizes |
+| 13 | [prompts/13-review-by-folder.md](../prompts/13-review-by-folder.md) | done (`internal/app`) | One list grouped by folder, compare columns, system colors with light and dark fallbacks |
 
 ## How to run a session
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -57,6 +58,10 @@ type choiceButtons struct {
 	keep, drop, skip widget.Clickable
 }
 
+type rowButtons struct {
+	open, skip, apply widget.Clickable
+}
+
 type ui struct {
 	deps Deps
 	win  *gioapp.Window
@@ -65,32 +70,45 @@ type ui struct {
 	pick, start, dry, apply widget.Clickable
 	exactOnly               widget.Bool
 	list                    widget.List
+	copies                  widget.List
 	clicks                  map[string]*choiceButtons
+	rows                    map[string]*rowButtons
 
-	mu       sync.Mutex
-	root     string
-	busy     bool
-	applying string
-	note     string
-	view     app.ScanView
-	review   app.ReviewModel
-	session  domain.Session
-	files    []domain.FileRef
-	thumbs   map[string]image.Image
-	ops      op.Ops
+	mu        sync.Mutex
+	root      string
+	scanning  bool
+	applying  string
+	applyBusy bool
+	drying    bool
+	note      string
+	view      app.ScanView
+	board     app.FolderBoard
+	review    app.ReviewModel
+	session   domain.Session
+	files     []domain.FileRef
+	selected  string
+	thumbs    map[string]image.Image
+	palette   app.Palette
+	themeAt   time.Time
+	ops       op.Ops
 }
 
 func newUI(d Deps, w *gioapp.Window) *ui {
 	th := material.NewTheme()
 	th.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
-	return &ui{
-		deps:   d,
-		win:    w,
-		th:     th,
-		list:   widget.List{List: layout.List{Axis: layout.Vertical}},
-		clicks: map[string]*choiceButtons{},
-		thumbs: map[string]image.Image{},
+	appearance, colors := readSystem()
+	ui := &ui{
+		deps:    d,
+		win:     w,
+		th:      th,
+		list:    widget.List{List: layout.List{Axis: layout.Vertical}},
+		copies:  widget.List{List: layout.List{Axis: layout.Horizontal}},
+		clicks:  map[string]*choiceButtons{},
+		rows:    map[string]*rowButtons{},
+		thumbs:  map[string]image.Image{},
+		palette: paintTheme(th, appearance, colors),
 	}
+	return ui
 }
 
 func (u *ui) loop(w *gioapp.Window) error {
@@ -116,22 +134,36 @@ func (u *ui) buttons(path string) *choiceButtons {
 }
 
 func (u *ui) layout(gtx layout.Context) layout.Dimensions {
+	u.refreshTheme()
 	u.mu.Lock()
-	listing := u.view.Listing
+	slot := app.SlotFrom(u.view, u.applying)
+	if u.drying {
+		slot.DryDisabled = true
+	}
+	if u.applyBusy && u.applying == "" {
+		slot.ApplyDisabled = true
+		if slot.Label == "" {
+			slot.Label = "Apply"
+		}
+	}
+	rows := append([]app.FolderRow(nil), u.board.Rows...)
+	note, banner, selected := u.note, u.review.Banner, u.selected
 	u.mu.Unlock()
-	if listing {
+	gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(time.Second)})
+	if !slot.Determinate && (slot.StartDisabled || slot.ApplyDisabled) {
 		gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(100 * time.Millisecond)})
 	}
+	paint.Fill(gtx.Ops, u.palette.Background)
 	if u.pick.Clicked(gtx) {
 		u.choose()
 	}
-	if u.start.Clicked(gtx) {
+	if !slot.StartDisabled && u.start.Clicked(gtx) {
 		u.begin()
 	}
-	if u.dry.Clicked(gtx) {
+	if !slot.DryDisabled && u.dry.Clicked(gtx) {
 		u.dryRun()
 	}
-	if u.apply.Clicked(gtx) {
+	if !slot.ApplyDisabled && u.apply.Clicked(gtx) {
 		u.applyPlan()
 	}
 	return layout.UniformInset(unit.Dp(12)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
@@ -147,50 +179,58 @@ func (u *ui) layout(gtx layout.Context) layout.Dimensions {
 				)
 			}),
 			layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
-			layout.Rigid(material.Button(u.th, &u.start, "Start scan").Layout),
-			layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
-			layout.Rigid(u.bars),
-			layout.Rigid(material.Body2(u.th, u.statusLine()).Layout),
 			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-				rows := u.rows()
-				return material.List(u.th, &u.list).Layout(gtx, len(rows), func(gtx layout.Context, i int) layout.Dimensions {
-					return rows[i](gtx)
-				})
+				return u.body(gtx, rows, note, banner, selected)
 			}),
 			layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{}.Layout(gtx,
-					layout.Rigid(material.Button(u.th, &u.dry, "Dry run").Layout),
-					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
-					layout.Rigid(material.Button(u.th, &u.apply, "Apply").Layout),
-				)
+				return u.actionRow(gtx, slot)
 			}),
 		)
 	})
 }
 
-func (u *ui) bars(gtx layout.Context) layout.Dimensions {
-	u.mu.Lock()
-	view := u.view
-	u.mu.Unlock()
-	frac, ok := view.Fraction()
-	if !ok {
+func (u *ui) refreshTheme() {
+	if !u.themeAt.IsZero() && time.Since(u.themeAt) < time.Second {
+		return
+	}
+	u.themeAt = time.Now()
+	appearance, colors := readSystem()
+	next := paintTheme(u.th, appearance, colors)
+	if next != u.palette {
+		u.palette = next
+		u.win.Invalidate()
+	}
+}
+
+func (u *ui) actionRow(gtx layout.Context, slot app.ActionSlot) layout.Dimensions {
+	frac := slot.Fraction
+	if !slot.Determinate && (slot.StartDisabled || slot.ApplyDisabled) {
 		frac = float32(time.Now().UnixMilli()%800) / 800
 	}
-	children := []layout.FlexChild{
-		layout.Rigid(material.ProgressBar(u.th, frac).Layout),
-	}
-	if view.SimilarTotal > 0 {
-		sim := float32(0)
-		if view.SimilarTotal > 0 {
-			sim = float32(view.SimilarDone) / float32(view.SimilarTotal)
+	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+		layout.Rigid(u.command(gtx, &u.start, "Start scan", slot.StartDisabled)),
+		layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
+		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+				layout.Rigid(material.Body2(u.th, slot.Label).Layout),
+				layout.Rigid(material.ProgressBar(u.th, frac).Layout),
+			)
+		}),
+		layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
+		layout.Rigid(u.command(gtx, &u.dry, "Dry run", slot.DryDisabled)),
+		layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
+		layout.Rigid(u.command(gtx, &u.apply, "Apply", slot.ApplyDisabled)),
+	)
+}
+
+func (u *ui) command(gtx layout.Context, click *widget.Clickable, label string, disabled bool) layout.Widget {
+	return func(gtx layout.Context) layout.Dimensions {
+		if disabled {
+			gtx = gtx.Disabled()
 		}
-		children = append(children,
-			layout.Rigid(layout.Spacer{Height: unit.Dp(4)}.Layout),
-			layout.Rigid(material.ProgressBar(u.th, sim).Layout),
-		)
+		return material.Button(u.th, click, label).Layout(gtx)
 	}
-	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
 }
 
 func (u *ui) labelRoot() string {
@@ -202,94 +242,165 @@ func (u *ui) labelRoot() string {
 	return u.root
 }
 
-func (u *ui) statusLine() string {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	if u.view.Listing {
-		return fmt.Sprintf("Listing the folder… %d files found", u.view.Found)
+func (u *ui) rowButtons(key string) *rowButtons {
+	b, ok := u.rows[key]
+	if !ok {
+		b = &rowButtons{}
+		u.rows[key] = b
 	}
-	if u.applying != "" {
-		return "Trash " + u.applying
-	}
-	if u.view.CurrentPath == "" {
-		return ""
-	}
-	return fmt.Sprintf("%s · %d bytes · %s", u.view.CurrentPath, u.view.CurrentSize, u.view.Stage)
+	return b
 }
 
-func (u *ui) rows() []layout.Widget {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	var rows []layout.Widget
-	add := func(text string) {
-		rows = append(rows, material.Body2(u.th, text).Layout)
-	}
-	if u.note != "" {
-		add(u.note)
-	}
-	if u.review.Banner != "" {
-		add(u.review.Banner)
-	}
-	if len(u.view.Queue) > 0 {
-		add("Queue")
-		for _, row := range u.view.Queue {
-			add(fmt.Sprintf("%s · %d bytes", row.Path, row.Size))
-		}
-	}
-	if len(u.view.Processed) > 0 {
-		add("Processed")
-		for _, row := range u.view.Processed {
-			add(fmt.Sprintf("%s · %d bytes · %s", row.Path, row.Size, row.Outcome))
-		}
-	}
-	for _, group := range u.review.Exact {
-		if group.HasRecommendation {
-			add(fmt.Sprintf("Keep %s (%d bytes). %s", group.Keeper, group.KeeperSize, group.Text))
-			add(fmt.Sprintf("Suggested deletes free %d bytes", group.Freed))
-		} else {
-			add("No suggestion. The copies tie.")
-		}
-		for _, member := range group.Members {
-			rows = append(rows, u.fileRow(member))
-		}
-	}
-	for _, group := range u.review.Similar {
-		add("Similar files. No delete suggestion.")
-		for _, member := range group.Members {
-			rows = append(rows, u.fileRow(member))
-		}
-	}
-	return rows
+func (u *ui) body(gtx layout.Context, rows []app.FolderRow, note, banner, selected string) layout.Dimensions {
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			if note == "" {
+				return layout.Dimensions{}
+			}
+			return material.Body2(u.th, note).Layout(gtx)
+		}),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			if banner == "" {
+				return layout.Dimensions{}
+			}
+			return material.Body2(u.th, banner).Layout(gtx)
+		}),
+		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+			return layout.Flex{}.Layout(gtx,
+				layout.Flexed(0.8, func(gtx layout.Context) layout.Dimensions {
+					return u.folderList(gtx, rows, selected)
+				}),
+				layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
+				layout.Flexed(1.2, func(gtx layout.Context) layout.Dimensions {
+					return u.compare(gtx, rows, selected)
+				}),
+			)
+		}),
+	)
 }
 
-func (u *ui) fileRow(member app.FileSize) layout.Widget {
-	path := member.Path
-	size := member.Size
-	return func(gtx layout.Context) layout.Dimensions {
-		b := u.buttons(path)
-		if b.keep.Clicked(gtx) {
-			u.decide(path, domain.ChoiceKeep)
+func (u *ui) folderList(gtx layout.Context, rows []app.FolderRow, selected string) layout.Dimensions {
+	type item struct {
+		heading string
+		row     *app.FolderRow
+	}
+	var items []item
+	prev := ""
+	for i := range rows {
+		row := &rows[i]
+		if row.Folder != prev {
+			items = append(items, item{heading: row.Folder})
+			prev = row.Folder
 		}
-		if b.drop.Clicked(gtx) {
-			u.decide(path, domain.ChoiceDelete)
+		items = append(items, item{row: row})
+	}
+	return material.List(u.th, &u.list).Layout(gtx, len(items), func(gtx layout.Context, i int) layout.Dimensions {
+		if items[i].heading != "" {
+			return material.Body1(u.th, items[i].heading).Layout(gtx)
 		}
-		if b.skip.Clicked(gtx) {
-			u.decide(path, domain.ChoiceSkip)
+		row := items[i].row
+		b := u.rowButtons(row.Key)
+		if b.open.Clicked(gtx) {
+			u.mu.Lock()
+			u.selected = row.Key
+			u.mu.Unlock()
 		}
-		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-			layout.Rigid(material.Body1(u.th, fmt.Sprintf("%s · %d bytes · %s", path, size, u.choice(path))).Layout),
-			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{}.Layout(gtx,
-					layout.Rigid(material.Button(u.th, &b.keep, "Keep").Layout),
+		label := row.Title
+		if row.Status != "" {
+			label = fmt.Sprintf("%s · %s", row.Title, row.Status)
+		}
+		if row.Key == selected {
+			label = "● " + label
+		}
+		return b.open.Layout(gtx, material.Body1(u.th, label).Layout)
+	})
+}
+
+func (u *ui) compare(gtx layout.Context, rows []app.FolderRow, selected string) layout.Dimensions {
+	var row *app.FolderRow
+	for i := range rows {
+		if rows[i].Key == selected {
+			row = &rows[i]
+			break
+		}
+	}
+	if row == nil && len(rows) > 0 {
+		row = &rows[0]
+	}
+	if row == nil {
+		return material.Body2(u.th, "Choose a folder and start a scan.").Layout(gtx)
+	}
+	current := *row
+	controls := u.rowButtons(current.Key)
+	if controls.skip.Clicked(gtx) {
+		u.skipSet(memberPaths(current))
+	}
+	if current.Kind == app.RowExact && controls.apply.Clicked(gtx) {
+		u.applyFolder(current)
+	}
+	hint := current.Text
+	if current.Kind == app.RowExact && !current.HasRecommendation {
+		hint = "No suggestion. The copies tie."
+	}
+	if current.Kind == app.RowSimilar {
+		hint = "Similar files. No delete suggestion."
+	}
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(material.H6(u.th, current.Title).Layout),
+		layout.Rigid(material.Body2(u.th, hint).Layout),
+		layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			children := []layout.FlexChild{
+				layout.Rigid(material.Button(u.th, &controls.skip, "Skip set").Layout),
+			}
+			if current.Kind == app.RowExact {
+				label := "Apply to all files of this type in " + filepath.Base(current.Folder)
+				children = append(children,
 					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
-					layout.Rigid(material.Button(u.th, &b.drop, "Delete").Layout),
-					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
-					layout.Rigid(material.Button(u.th, &b.skip, "Skip").Layout),
+					layout.Rigid(material.Button(u.th, &controls.apply, label).Layout),
 				)
-			}),
-			layout.Rigid(u.thumb(path)),
-		)
+			}
+			return layout.Flex{}.Layout(gtx, children...)
+		}),
+		layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
+		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+			return material.List(u.th, &u.copies).Layout(gtx, len(current.Members), func(gtx layout.Context, i int) layout.Dimensions {
+				return u.copyColumn(gtx, current.Members[i])
+			})
+		}),
+	)
+}
+
+func (u *ui) copyColumn(gtx layout.Context, member app.FileSize) layout.Dimensions {
+	b := u.buttons(member.Path)
+	if b.keep.Clicked(gtx) {
+		u.decide(member.Path, domain.ChoiceKeep)
 	}
+	if b.drop.Clicked(gtx) {
+		u.decide(member.Path, domain.ChoiceDelete)
+	}
+	if b.skip.Clicked(gtx) {
+		u.decide(member.Path, domain.ChoiceSkip)
+	}
+	gtx.Constraints.Min.X = gtx.Dp(unit.Dp(180))
+	gtx.Constraints.Max.X = gtx.Dp(unit.Dp(220))
+	return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+			layout.Rigid(u.thumb(member.Path)),
+			layout.Rigid(material.Body2(u.th, fmt.Sprintf("%s · %d bytes · %s", member.Path, member.Size, u.choice(member.Path))).Layout),
+			layout.Rigid(material.Button(u.th, &b.keep, "Keep").Layout),
+			layout.Rigid(material.Button(u.th, &b.drop, "Delete").Layout),
+			layout.Rigid(material.Button(u.th, &b.skip, "Skip").Layout),
+		)
+	})
+}
+
+func memberPaths(row app.FolderRow) []string {
+	paths := make([]string, len(row.Members))
+	for i, member := range row.Members {
+		paths[i] = member.Path
+	}
+	return paths
 }
 
 func (u *ui) thumb(path string) layout.Widget {
@@ -348,17 +459,19 @@ func (u *ui) choose() {
 
 func (u *ui) begin() {
 	u.mu.Lock()
-	if u.busy || u.root == "" {
+	if u.scanning || u.root == "" {
 		u.mu.Unlock()
 		return
 	}
 	root := u.root
 	exactOnly := u.exactOnly.Value
-	u.busy = true
+	u.scanning = true
 	u.view = app.ScanView{}
+	u.board = app.FolderBoard{}
 	u.review = app.ReviewModel{}
 	u.session = domain.Session{}
 	u.files = nil
+	u.selected = ""
 	u.thumbs = map[string]image.Image{}
 	u.note = ""
 	u.mu.Unlock()
@@ -369,11 +482,12 @@ func (u *ui) scan(root string, exactOnly bool) {
 	result, err := app.Scan(root, u.deps.DataDir, u.deps.Walk, u.deps.Files, u.deps.ID, u.deps.Similar, exactOnly, func(ev app.ProgressEvent) {
 		u.mu.Lock()
 		u.view.Apply(ev)
+		u.board.Apply(ev)
 		u.mu.Unlock()
 		u.win.Invalidate()
 	})
 	u.mu.Lock()
-	u.busy = false
+	u.scanning = false
 	if err != nil {
 		u.note = err.Error()
 		u.mu.Unlock()
@@ -393,6 +507,10 @@ func (u *ui) scan(root string, exactOnly bool) {
 	u.session = result.Session
 	u.files = result.Files
 	u.review = app.Review(result.Session, entries)
+	u.board.UseReview(u.review)
+	if len(u.board.Rows) > 0 {
+		u.selected = u.board.Rows[0].Key
+	}
 	u.mu.Unlock()
 	u.win.Invalidate()
 	u.loadThumbs()
@@ -431,16 +549,18 @@ func (u *ui) loadThumbs() {
 
 func (u *ui) dryRun() {
 	u.mu.Lock()
-	if u.busy {
+	if u.drying {
 		u.mu.Unlock()
 		return
 	}
+	u.drying = true
 	session := u.session
 	files := append([]domain.FileRef(nil), u.files...)
 	u.mu.Unlock()
 	go func() {
 		report, err := app.DryRun(session, files, u.deps.Library, u.deps.Trash, u.deps.Disk)
 		u.mu.Lock()
+		u.drying = false
 		if err != nil {
 			u.note = err.Error() + "\n" + app.NothingChanged
 		} else {
@@ -451,20 +571,53 @@ func (u *ui) dryRun() {
 	}()
 }
 
+func (u *ui) skipSet(paths []string) {
+	u.mu.Lock()
+	next, err := app.SkipSet(u.session, paths)
+	if err != nil {
+		u.note = err.Error()
+	} else {
+		u.session = next
+		u.note = ""
+	}
+	u.mu.Unlock()
+	u.win.Invalidate()
+}
+
+func (u *ui) applyFolder(row app.FolderRow) {
+	open := ""
+	if len(row.Members) > 0 {
+		open = row.Members[0].Path
+	}
+	if row.Keeper != "" {
+		open = row.Keeper
+	}
+	u.mu.Lock()
+	next, err := app.ApplySameTypeInFolder(u.session, row.Folder, open)
+	if err != nil {
+		u.note = err.Error()
+	} else {
+		u.session = next
+		u.note = ""
+	}
+	u.mu.Unlock()
+	u.win.Invalidate()
+}
+
 func (u *ui) applyPlan() {
 	u.mu.Lock()
-	if u.busy {
+	if u.applyBusy {
 		u.mu.Unlock()
 		return
 	}
-	u.busy = true
+	u.applyBusy = true
 	session := u.session
 	files := append([]domain.FileRef(nil), u.files...)
 	u.mu.Unlock()
 	go func() {
 		next, err := app.Apply(session, files, u.deps.Library, progressTrash{inner: u.deps.Trash, ui: u}, u.deps.Disk)
 		u.mu.Lock()
-		u.busy = false
+		u.applyBusy = false
 		u.applying = ""
 		if err != nil {
 			u.note = err.Error()

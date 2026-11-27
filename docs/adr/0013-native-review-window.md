@@ -24,3 +24,4 @@ These parts of ADR-0002 stay: one binary per OS/architecture, no cloud API, rele
 - This supersedes ADR-0002. The product UI is the native window.
 - A release still publishes the five archives named in ADR-0012. Their names do not change.
 - Gio needs a C compiler on macOS and Linux. The Windows build links the window without turning cgo off.
+- A system color is used when the operating system provides it. The light or dark fallback supplies every role the system does not. The window does not ship Gio’s indigo palette or a brand green. Linux reads the desktop color-scheme and does not link GTK.

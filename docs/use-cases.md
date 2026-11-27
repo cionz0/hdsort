@@ -51,6 +51,7 @@ sequenceDiagram
     Note over Scan: Similarity runs after the exact groups
   end
   Scan-->>Window: Open session with exact groups and skipped paths
+  Note over Window: One list grouped by folder. Each row's status changes in place.
 ```
 
 Two readable files with the same bytes produce the same content ID, including two empty files. Two files that share a size and share the first and last 64 KiB but differ in the middle produce different content IDs. With exact-only off, near-duplicates continue into UC-3. With exact-only on, those near-duplicates stay ungrouped.
@@ -70,7 +71,15 @@ sequenceDiagram
   else Names and library rank still tie
     Policy-->>Window: No recommendation
   end
-  Owner->>Window: Keep, delete, or skip each file
+  Owner->>Window: Select a row in its folder
+  Window-->>Owner: Copies as columns, with previews
+  alt The owner knows which copy to keep
+    Owner->>Window: Keep, delete, or skip one copy
+  else The owner does not know
+    Owner->>Window: Skip the set
+  else The owner keeps a whole folder
+    Owner->>Window: Apply to all files of this type in this folder
+  end
 ```
 
 The recommendation the owner sees follows the rank in `docs/architecture.md`:
@@ -82,7 +91,7 @@ The recommendation the owner sees follows the rank in `docs/architecture.md`:
 
 `report_v1.pdf` and `report_final.pdf` with different bytes do not form a group. With identical bytes they do, and the version words still do not pick the keeper.
 
-The owner’s decision is stored against the file id. Nothing is trashed in this use case.
+The owner’s decision is stored against the file id. Nothing is trashed in this use case. Skip on a set records skip for every member. Applying the folder action records keep for every matching exact member in that folder and delete for members of those groups in other folders. It does not decide a similar group, and it does not decide an exact group of a different type.
 
 When the scan root has a synced-folder path segment (`CloudStorage`, `Mobile Documents`, `Dropbox`, or `Google Drive`), the window shows the banner from `docs/architecture.md` before the owner confirms a delete.
 
@@ -111,7 +120,7 @@ ADR-0010 fixes the fingerprints. The separation this use case already required s
 
 ## UC-4 Apply the confirmed plan
 
-The owner asks hdsort to carry out the decisions. hdsort checks the plan, moves confirmed deletes to Trash, renames confirmed moves inside the scan root, and only then records survivors at their final paths.
+The owner asks hdsort to carry out the decisions. hdsort checks the plan, moves confirmed deletes to Trash, renames confirmed moves inside the scan root, and only then records survivors at their final paths. While a file is moving to Trash, the progress bar names that path and Apply is disabled. Dry run and Start scan stay enabled.
 
 ```mermaid
 sequenceDiagram
@@ -123,6 +132,7 @@ sequenceDiagram
   Owner->>Apply: Apply session
   Apply->>Apply: Reject unconfirmed deletes and last-copy loss
   Apply->>Trash: Move each confirmed delete
+  Note over Apply,Trash: The progress bar names that path and Apply is disabled
   alt Every trash call succeeded
     Trash-->>Apply: Ok
     Apply->>Disk: Rename each confirmed move inside the root
