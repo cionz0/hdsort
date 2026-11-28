@@ -24,6 +24,8 @@ Status below is the source of truth for “what is next.” The session that fin
 | 16 | [prompts/16-quiet-system-colors.md](../prompts/16-quiet-system-colors.md) | done (`internal/app`) | Quiet system colors; accent only on committing actions |
 | 17 | [prompts/17-progress-relative-path.md](../prompts/17-progress-relative-path.md) | done (`internal/app`) | Progress bar paths relative to the scan root |
 | 18 | [prompts/18-choice-radios.md](../prompts/18-choice-radios.md) | done (`internal/app`) | Keep, Delete, and Skip as radios, with the suggestion selected |
+| 19 | [prompts/19-folder-outline.md](../prompts/19-folder-outline.md) | not started | Expandable folder outline in the left pane |
+| 20 | [prompts/20-trash-selected-folder.md](../prompts/20-trash-selected-folder.md) | not started | Trash the selected folder and everything inside it |
 
 ## How to run a session
 

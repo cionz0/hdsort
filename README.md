@@ -50,7 +50,7 @@ The binary talks only to folders on that computer. It is not a cloud service.
 
 ## Status
 
-Prompts 01 through 18 are done. The notes under [Later ideas](#later-ideas) are not prompts and are not the next session.
+Prompts 01 through 18 are done. The next session is [prompts/19-folder-outline.md](prompts/19-folder-outline.md), then [prompts/20-trash-selected-folder.md](prompts/20-trash-selected-folder.md). The notes under [Later ideas](#later-ideas) are not prompts and are not the next session.
 
 ## Later ideas
 
