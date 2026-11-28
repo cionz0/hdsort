@@ -74,7 +74,7 @@ Compile-time dependencies point inward. Adapters import `internal/app` so they c
 | `cmd/hdsort` | Composition root. Builds adapters and opens the native review window. |
 | `internal/domain` | Content ID, groups, keeper ranking, plan checks, layout strategy results. Pure functions. |
 | `internal/app` | Use cases: scan, reconcile, decide, apply, propose layout. Declares the port interfaces it calls. |
-| `internal/adapters/filesystem` | Walk, skip rules, native folder dialog. |
+| `internal/adapters/filesystem` | Walk, skip rules, native folder dialog, and the default application for one file. |
 | `internal/adapters/hash` | Size, partial BLAKE3, full BLAKE3. |
 | `internal/adapters/similar` | Average hash for JPEG, PNG, and GIF. Simhash for `.txt` and `.md`. |
 | `internal/adapters/sqlite` | `LibraryRepository` and `SessionRepository`. WAL mode. |
@@ -86,7 +86,7 @@ Port interfaces stay small and live next to the use case that calls them (Go Cod
 
 ## Review window
 
-The window keeps one list of duplicate sets. A file that is unique, a symlink, or a dataless placeholder is not listed. While a file is still being read it can appear; it leaves when the scan knows it is not a duplicate. An exact or similar group is one row, filed under the suggested keeper’s folder, or under the first member’s folder when the group has no recommendation. Rows from the same folder stay together. Paths drawn in the window are relative to the chosen folder. Sizes are shown as B, KB, MB, or GB. The selected row opens beside the list, separated from it by a rule. Each copy is its own bordered column: a preview, the relative path, the size, and Keep, Delete, and Skip with a gap between the buttons. The preview is the operating-system thumbnail when that call returns one. Otherwise a JPEG, PNG, or GIF uses the existing thumbnail, and any other type shows an empty preview well. The owner can skip one copy or the whole set, and can keep every file of the open type in that folder while deleting copies that live in other folders. Decisions still store the absolute path.
+The window keeps one list of duplicate sets. A file that is unique, a symlink, or a dataless placeholder is not listed. While a file is still being read it can appear; it leaves when the scan knows it is not a duplicate. An exact or similar group is one row, filed under the suggested keeper’s folder, or under the first member’s folder when the group has no recommendation. Rows from the same folder stay together. Paths drawn in the window are relative to the chosen folder. Sizes are shown as B, KB, MB, or GB. The selected row opens beside the list, separated from it by a rule. Each copy is its own bordered column: a preview, the relative path, the size, and Open, Keep, Delete, and Skip with a gap between the buttons. Open asks the operating system to open that copy in its default application. It uses the cleaned absolute path, and it does not record a decision or trash the file. The preview is the operating-system thumbnail when that call returns one. Otherwise a JPEG, PNG, or GIF uses the existing thumbnail, and any other type shows an empty preview well. The owner can skip one copy or the whole set, and can keep every file of the open type in that folder while deleting copies that live in other folders. Decisions still store the absolute path.
 
 Start scan, the progress bar, Dry run, and Apply share one row. The bar names the action that is running, and only that action’s control is disabled.
 
@@ -96,7 +96,10 @@ sequenceDiagram
   participant Window as Review window
   Owner->>Window: Select the next row in this folder
   Window-->>Owner: Bordered columns, relative paths, sizes, and previews
-  alt The owner skips the set
+  alt The owner inspects one copy
+    Owner->>Window: Open
+    Window-->>Owner: That file in its default application
+  else The owner skips the set
     Owner->>Window: Skip set
   else The owner keeps this folder
     Owner->>Window: Apply to all files of this type in this folder

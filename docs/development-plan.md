@@ -20,7 +20,7 @@ Status below is the source of truth for “what is next.” The session that fin
 | 12 | [prompts/12-native-window.md](../prompts/12-native-window.md) | done (`internal/app`) | Native window, scan progress, thumbnails, keeper and sizes |
 | 13 | [prompts/13-review-by-folder.md](../prompts/13-review-by-folder.md) | done (`internal/app`) | One list grouped by folder, compare columns, system colors with light and dark fallbacks |
 | 14 | [prompts/14-readable-review.md](../prompts/14-readable-review.md) | done (`internal/app`) | Duplicate sets only, relative paths, readable sizes, separated columns, system preview |
-| 15 | [prompts/15-open-copy.md](../prompts/15-open-copy.md) | not started | Open one copy in the default application |
+| 15 | [prompts/15-open-copy.md](../prompts/15-open-copy.md) | done (`internal/app`) | Open one copy in the default application |
 | 16 | [prompts/16-quiet-system-colors.md](../prompts/16-quiet-system-colors.md) | not started | Quiet system colors; accent only on committing actions |
 
 ## How to run a session

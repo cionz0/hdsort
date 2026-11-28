@@ -73,7 +73,10 @@ sequenceDiagram
   end
   Owner->>Window: Select a row in its folder
   Window-->>Owner: Bordered columns, relative paths, sizes, and previews
-  alt The owner knows which copy to keep
+  alt The owner inspects one copy
+    Owner->>Window: Open
+    Window-->>Owner: That file in its default application
+  else The owner knows which copy to keep
     Owner->>Window: Keep, delete, or skip one copy
   else The owner does not know
     Owner->>Window: Skip the set
@@ -91,7 +94,7 @@ The recommendation the owner sees follows the rank in `docs/architecture.md`:
 
 `report_v1.pdf` and `report_final.pdf` with different bytes do not form a group. With identical bytes they do, and the version words still do not pick the keeper.
 
-The owner’s decision is stored against the file id. Nothing is trashed in this use case. The path on a decision is the absolute path; the window draws that path relative to the scan root and draws the size in B, KB, MB, or GB. Skip on a set records skip for every member. Applying the folder action records keep for every matching exact member in that folder and delete for members of those groups in other folders. It does not decide a similar group, and it does not decide an exact group of a different type.
+The owner’s decision is stored against the file id. Nothing is trashed in this use case. Open does not record a decision: it hands the copy’s cleaned absolute path to the default application. The path on a decision is the absolute path; the window draws that path relative to the scan root and draws the size in B, KB, MB, or GB. Skip on a set records skip for every member. Applying the folder action records keep for every matching exact member in that folder and delete for members of those groups in other folders. It does not decide a similar group, and it does not decide an exact group of a different type.
 
 When the scan root has a synced-folder path segment (`CloudStorage`, `Mobile Documents`, `Dropbox`, or `Google Drive`), the window shows the banner from `docs/architecture.md` before the owner confirms a delete.
 

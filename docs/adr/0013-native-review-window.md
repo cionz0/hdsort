@@ -25,4 +25,5 @@ These parts of ADR-0002 stay: one binary per OS/architecture, no cloud API, rele
 - A release still publishes the five archives named in ADR-0012. Their names do not change.
 - Gio needs a C compiler on macOS and Linux. The Windows build links the window without turning cgo off.
 - A system color is used when the operating system provides it. The light or dark fallback supplies every role the system does not. The window does not ship Gio’s indigo palette or a brand green. Linux reads the desktop color-scheme and does not link GTK.
+- Open on a copy asks the operating system to open that file in its default application. It does not record a decision.
 - The list shows duplicate sets only. Paths on screen are relative to the chosen folder, and sizes use B, KB, MB, or GB. Each copy is a bordered column. A preview uses the operating-system thumbnail when that call returns one, and otherwise the JPEG, PNG, or GIF thumbnail. Linux does not link a toolkit to invent a thumbnail, so a non-image there has an empty preview well.

@@ -45,6 +45,7 @@ func defaultWindow() error {
 	}
 	return gui.Run(gui.Deps{
 		Pick:    filesystem.NewSystemPicker(),
+		Launch:  filesystem.NewSystemLauncher(),
 		Walk:    filesystem.NewWalker(nil),
 		Files:   filesystem.NewOpener(),
 		ID:      hash.New(),

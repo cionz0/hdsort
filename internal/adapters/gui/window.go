@@ -27,6 +27,7 @@ import (
 // Deps is every port the window calls. The composition root fills it.
 type Deps struct {
 	Pick    interface{ Pick() (string, error) }
+	Launch  app.Launcher
 	Walk    app.Walker
 	Files   app.FileReader
 	ID      app.Identifier
@@ -56,7 +57,7 @@ func Run(d Deps) error {
 }
 
 type choiceButtons struct {
-	keep, drop, skip widget.Clickable
+	launch, keep, drop, skip widget.Clickable
 }
 
 type rowButtons struct {
@@ -398,6 +399,9 @@ func (u *ui) compare(gtx layout.Context, rows []app.FolderRow, selected, root st
 
 func (u *ui) copyColumn(gtx layout.Context, root string, member app.FileSize) layout.Dimensions {
 	b := u.buttons(member.Path)
+	if b.launch.Clicked(gtx) {
+		u.openCopy(member.Path)
+	}
 	if b.keep.Clicked(gtx) {
 		u.decide(member.Path, domain.ChoiceKeep)
 	}
@@ -432,6 +436,8 @@ func (u *ui) copyColumn(gtx layout.Context, root string, member app.FileSize) la
 				}
 				lines = append(lines,
 					layout.Rigid(layout.Spacer{Height: unit.Dp(10)}.Layout),
+					layout.Rigid(material.Button(u.th, &b.launch, "Open").Layout),
+					layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
 					layout.Rigid(material.Button(u.th, &b.keep, "Keep").Layout),
 					layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
 					layout.Rigid(material.Button(u.th, &b.drop, "Delete").Layout),
@@ -488,6 +494,21 @@ func (u *ui) choice(path string) string {
 		}
 	}
 	return ""
+}
+
+func (u *ui) openCopy(path string) {
+	go func() {
+		u.mu.Lock()
+		session := u.session
+		u.mu.Unlock()
+		_, err := app.OpenCopy(session, u.deps.Launch, path)
+		u.mu.Lock()
+		if err != nil {
+			u.note = err.Error()
+		}
+		u.mu.Unlock()
+		u.win.Invalidate()
+	}()
 }
 
 func (u *ui) decide(path string, choice domain.Choice) {
