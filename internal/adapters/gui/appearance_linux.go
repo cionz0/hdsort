@@ -26,7 +26,7 @@ func readSystem() (app.Appearance, app.SystemColors) {
 	var colors app.SystemColors
 	if accent, ok := portalValue(obj, "accent-color"); ok {
 		if c, ok := accentRGB(accent); ok {
-			colors.Primary = app.OptionalColor{Color: c, Set: true}
+			colors.Accent = app.OptionalColor{Color: c, Set: true}
 		}
 	}
 	return appearance, colors

@@ -26,14 +26,16 @@ static int hdsortIsDark(void) {
 	return [match isEqualToString:NSAppearanceNameDarkAqua] ? 1 : 0;
 }
 
-static int hdsortColor(int which, unsigned char *r, unsigned char *g, unsigned char *b) {
+static int hdsortColor(int which, unsigned char *r, unsigned char *g, unsigned char *b, unsigned char *a) {
 	NSColor *c = nil;
-	if (which == 0) {
-		c = [NSColor windowBackgroundColor];
-	} else if (which == 1) {
-		c = [NSColor labelColor];
-	} else {
-		c = [NSColor controlAccentColor];
+	switch (which) {
+	case 0: c = [NSColor windowBackgroundColor]; break;
+	case 1: c = [NSColor underPageBackgroundColor]; break;
+	case 2: c = [NSColor controlColor]; break;
+	case 3: c = [NSColor labelColor]; break;
+	case 4: c = [NSColor secondaryLabelColor]; break;
+	case 5: c = [NSColor separatorColor]; break;
+	default: c = [NSColor controlAccentColor]; break;
 	}
 	NSAppearance *appearance = nil;
 	if (NSApp != nil) {
@@ -46,7 +48,7 @@ static int hdsortColor(int which, unsigned char *r, unsigned char *g, unsigned c
 		return 0;
 	}
 	__block int ok = 0;
-	__block unsigned char rr = 0, gg = 0, bb = 0;
+	__block unsigned char rr = 0, gg = 0, bb = 0, aa = 0;
 	[appearance performAsCurrentDrawingAppearance:^{
 		NSColor *rgb = [c colorUsingColorSpace:[NSColorSpace sRGBColorSpace]];
 		if (rgb == nil) {
@@ -55,6 +57,7 @@ static int hdsortColor(int which, unsigned char *r, unsigned char *g, unsigned c
 		rr = (unsigned char)(rgb.redComponent * 255.0 + 0.5);
 		gg = (unsigned char)(rgb.greenComponent * 255.0 + 0.5);
 		bb = (unsigned char)(rgb.blueComponent * 255.0 + 0.5);
+		aa = (unsigned char)(rgb.alphaComponent * 255.0 + 0.5);
 		ok = 1;
 	}];
 	if (!ok) {
@@ -63,6 +66,7 @@ static int hdsortColor(int which, unsigned char *r, unsigned char *g, unsigned c
 	*r = rr;
 	*g = gg;
 	*b = bb;
+	*a = aa;
 	return 1;
 }
 */
@@ -80,18 +84,22 @@ func readSystem() (app.Appearance, app.SystemColors) {
 	}
 	return appearance, app.SystemColors{
 		Background: darwinColor(0),
-		Text:       darwinColor(1),
-		Primary:    darwinColor(2),
+		Surface:    darwinColor(1),
+		Control:    darwinColor(2),
+		Text:       darwinColor(3),
+		Secondary:  darwinColor(4),
+		Separator:  darwinColor(5),
+		Accent:     darwinColor(6),
 	}
 }
 
 func darwinColor(which C.int) app.OptionalColor {
-	var r, g, b C.uchar
-	if C.hdsortColor(which, &r, &g, &b) == 0 {
+	var r, g, b, a C.uchar
+	if C.hdsortColor(which, &r, &g, &b, &a) == 0 {
 		return app.OptionalColor{}
 	}
 	return app.OptionalColor{
-		Color: color.NRGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: 0xFF},
+		Color: color.NRGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: uint8(a)},
 		Set:   true,
 	}
 }

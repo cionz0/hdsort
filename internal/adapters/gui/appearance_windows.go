@@ -23,7 +23,7 @@ func readSystem() (app.Appearance, app.SystemColors) {
 	}
 	var colors app.SystemColors
 	if accent, ok := windowsAccent(); ok {
-		colors.Primary = app.OptionalColor{Color: accent, Set: true}
+		colors.Accent = app.OptionalColor{Color: accent, Set: true}
 	}
 	return appearance, colors
 }

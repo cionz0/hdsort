@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"image/color"
 	"os"
 	"path/filepath"
 	"sync"
@@ -176,9 +177,9 @@ func (u *ui) layout(gtx layout.Context) layout.Dimensions {
 			layout.Rigid(material.CheckBox(u.th, &u.exactOnly, "Exact duplicates only").Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-					layout.Rigid(material.Button(u.th, &u.pick, "Choose folder").Layout),
+					layout.Rigid(u.quietButton(&u.pick, "Choose folder")),
 					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
-					layout.Flexed(1, material.Body1(u.th, u.labelRoot()).Layout),
+					layout.Flexed(1, u.hint(u.labelRoot())),
 				)
 			}),
 			layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
@@ -212,27 +213,77 @@ func (u *ui) actionRow(gtx layout.Context, slot app.ActionSlot) layout.Dimension
 		frac = float32(time.Now().UnixMilli()%800) / 800
 	}
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-		layout.Rigid(u.command(gtx, &u.start, "Start scan", slot.StartDisabled)),
+		layout.Rigid(u.command(gtx, &u.start, "Start scan", slot.StartDisabled, false)),
 		layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
 		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+			bar := material.ProgressBar(u.th, frac)
+			bar.Color = u.palette.Accent
 			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				layout.Rigid(material.Body2(u.th, slot.Label).Layout),
-				layout.Rigid(material.ProgressBar(u.th, frac).Layout),
+				layout.Rigid(u.hint(slot.Label)),
+				layout.Rigid(bar.Layout),
 			)
 		}),
 		layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
-		layout.Rigid(u.command(gtx, &u.dry, "Dry run", slot.DryDisabled)),
+		layout.Rigid(u.command(gtx, &u.dry, "Dry run", slot.DryDisabled, false)),
 		layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
-		layout.Rigid(u.command(gtx, &u.apply, "Apply", slot.ApplyDisabled)),
+		layout.Rigid(u.command(gtx, &u.apply, "Apply", slot.ApplyDisabled, true)),
 	)
 }
 
-func (u *ui) command(gtx layout.Context, click *widget.Clickable, label string, disabled bool) layout.Widget {
+func (u *ui) command(gtx layout.Context, click *widget.Clickable, label string, disabled, accent bool) layout.Widget {
 	return func(gtx layout.Context) layout.Dimensions {
 		if disabled {
 			gtx = gtx.Disabled()
 		}
-		return material.Button(u.th, click, label).Layout(gtx)
+		if accent {
+			return u.accentButton(click, label)(gtx)
+		}
+		return u.quietButton(click, label)(gtx)
+	}
+}
+
+func (u *ui) quietButton(click *widget.Clickable, label string) layout.Widget {
+	return func(gtx layout.Context) layout.Dimensions {
+		btn := material.Button(u.th, click, label)
+		btn.Background = u.palette.Control
+		btn.Color = u.palette.Text
+		btn.CornerRadius = unit.Dp(8)
+		return widget.Border{
+			Color:        u.palette.Separator,
+			CornerRadius: unit.Dp(8),
+			Width:        unit.Dp(1),
+		}.Layout(gtx, btn.Layout)
+	}
+}
+
+func (u *ui) accentButton(click *widget.Clickable, label string) layout.Widget {
+	return func(gtx layout.Context) layout.Dimensions {
+		btn := material.Button(u.th, click, label)
+		btn.Background = u.palette.Accent
+		btn.Color = u.palette.OnAccent
+		btn.CornerRadius = unit.Dp(8)
+		return btn.Layout(gtx)
+	}
+}
+
+func (u *ui) hint(text string) layout.Widget {
+	return func(gtx layout.Context) layout.Dimensions {
+		label := material.Body2(u.th, text)
+		label.Color = u.palette.Secondary
+		return label.Layout(gtx)
+	}
+}
+
+func (u *ui) fill(c color.NRGBA, w layout.Widget) layout.Widget {
+	return func(gtx layout.Context) layout.Dimensions {
+		macro := op.Record(gtx.Ops)
+		dims := w(gtx)
+		call := macro.Stop()
+		defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
+		paint.ColorOp{Color: c}.Add(gtx.Ops)
+		paint.PaintOp{}.Add(gtx.Ops)
+		call.Add(gtx.Ops)
+		return dims
 	}
 }
 
@@ -291,7 +342,7 @@ func (u *ui) vline(gtx layout.Context) layout.Dimensions {
 		h = 1
 	}
 	defer clip.Rect(image.Rectangle{Max: image.Pt(w, h)}).Push(gtx.Ops).Pop()
-	paint.ColorOp{Color: u.palette.Text}.Add(gtx.Ops)
+	paint.ColorOp{Color: u.palette.Separator}.Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
 	return layout.Dimensions{Size: image.Pt(w, h)}
 }
@@ -326,15 +377,22 @@ func (u *ui) folderList(gtx layout.Context, rows []app.FolderRow, selected, root
 			u.selected = row.Key
 			u.mu.Unlock()
 		}
-		label := row.Title
-		if row.Status != "" {
-			label = fmt.Sprintf("%s · %s", row.Title, row.Status)
-		}
+		title := row.Title
 		if row.Key == selected {
-			label = "● " + label
+			title = "● " + title
 		}
 		return layout.Inset{Top: unit.Dp(3), Bottom: unit.Dp(3), Left: unit.Dp(8)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-			return b.open.Layout(gtx, material.Body1(u.th, label).Layout)
+			return b.open.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+					layout.Rigid(material.Body1(u.th, title).Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						if row.Status == "" {
+							return layout.Dimensions{}
+						}
+						return u.hint(" · " + row.Status)(gtx)
+					}),
+				)
+			})
 		})
 	})
 }
@@ -373,17 +431,17 @@ func (u *ui) compare(gtx layout.Context, rows []app.FolderRow, selected, root st
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(material.H6(u.th, current.Title).Layout),
-		layout.Rigid(material.Body2(u.th, hint).Layout),
+		layout.Rigid(u.hint(hint)),
 		layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			children := []layout.FlexChild{
-				layout.Rigid(material.Button(u.th, &controls.skip, "Skip set").Layout),
+				layout.Rigid(u.quietButton(&controls.skip, "Skip set")),
 			}
 			if current.Kind == app.RowExact {
 				label := "Apply to all files of this type in " + filepath.Base(current.Folder)
 				children = append(children,
 					layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
-					layout.Rigid(material.Button(u.th, &controls.apply, label).Layout),
+					layout.Rigid(u.accentButton(&controls.apply, label)),
 				)
 			}
 			return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
@@ -415,38 +473,38 @@ func (u *ui) copyColumn(gtx layout.Context, root string, member app.FileSize) la
 	gtx.Constraints.Max.X = gtx.Dp(unit.Dp(240))
 	return layout.Inset{Right: unit.Dp(12)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return widget.Border{
-			Color:        u.palette.Text,
+			Color:        u.palette.Separator,
 			CornerRadius: unit.Dp(8),
 			Width:        unit.Dp(1),
-		}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		}.Layout(gtx, u.fill(u.palette.Surface, func(gtx layout.Context) layout.Dimensions {
 			return layout.UniformInset(unit.Dp(10)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 				choice := u.choice(member.Path)
 				lines := []layout.FlexChild{
 					layout.Rigid(u.thumb(member.Path)),
 					layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
-					layout.Rigid(material.Body2(u.th, app.DisplayPath(root, member.Path)).Layout),
+					layout.Rigid(u.hint(app.DisplayPath(root, member.Path))),
 					layout.Rigid(layout.Spacer{Height: unit.Dp(4)}.Layout),
-					layout.Rigid(material.Body1(u.th, app.FormatSize(member.Size)).Layout),
+					layout.Rigid(u.hint(app.FormatSize(member.Size))),
 				}
 				if choice != "" {
 					lines = append(lines,
 						layout.Rigid(layout.Spacer{Height: unit.Dp(4)}.Layout),
-						layout.Rigid(material.Body2(u.th, choice).Layout),
+						layout.Rigid(u.hint(choice)),
 					)
 				}
 				lines = append(lines,
 					layout.Rigid(layout.Spacer{Height: unit.Dp(10)}.Layout),
-					layout.Rigid(material.Button(u.th, &b.launch, "Open").Layout),
+					layout.Rigid(u.quietButton(&b.launch, "Open")),
 					layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
-					layout.Rigid(material.Button(u.th, &b.keep, "Keep").Layout),
+					layout.Rigid(u.quietButton(&b.keep, "Keep")),
 					layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
-					layout.Rigid(material.Button(u.th, &b.drop, "Delete").Layout),
+					layout.Rigid(u.quietButton(&b.drop, "Delete")),
 					layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
-					layout.Rigid(material.Button(u.th, &b.skip, "Skip").Layout),
+					layout.Rigid(u.quietButton(&b.skip, "Skip")),
 				)
 				return layout.Flex{Axis: layout.Vertical}.Layout(gtx, lines...)
 			})
-		})
+		}))
 	})
 }
 
@@ -464,24 +522,26 @@ func (u *ui) thumb(path string) layout.Widget {
 		height := gtx.Dp(unit.Dp(140))
 		size := image.Pt(width, height)
 		return widget.Border{
-			Color:        u.palette.Text,
+			Color:        u.palette.Separator,
 			CornerRadius: unit.Dp(4),
 			Width:        unit.Dp(1),
-		}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		}.Layout(gtx, u.fill(u.palette.Surface, func(gtx layout.Context) layout.Dimensions {
 			gtx.Constraints.Min = size
 			gtx.Constraints.Max = size
 			u.mu.Lock()
 			img := u.thumbs[path]
 			u.mu.Unlock()
 			if img == nil {
-				return layout.Center.Layout(gtx, material.Caption(u.th, "No preview").Layout)
+				caption := material.Caption(u.th, "No preview")
+				caption.Color = u.palette.Secondary
+				return layout.Center.Layout(gtx, caption.Layout)
 			}
 			return widget.Image{
 				Src:   paint.NewImageOp(img),
 				Fit:   widget.Contain,
 				Scale: 1,
 			}.Layout(gtx)
-		})
+		}))
 	}
 }
 

@@ -269,8 +269,56 @@ func TestAcceptance_RunningActionDisablesItsControl(t *testing.T) {
 	}
 }
 
+func TestAcceptance_QuietFallbackIsNotBlackOnWhite(t *testing.T) {
+	white := color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
+	light := app.LightFallback
+	if light.Background != white || light.Control != white || light.OnAccent != white {
+		t.Fatalf("light solids = %+v", light)
+	}
+	if light.Surface != (color.NRGBA{R: 0xF6, G: 0xF6, B: 0xF6, A: 0xFF}) {
+		t.Fatalf("light surface = %+v", light.Surface)
+	}
+	if light.Text.A != 217 || light.Secondary.A != 128 || light.Separator.A != 26 {
+		t.Fatalf("light alpha text %d secondary %d separator %d", light.Text.A, light.Secondary.A, light.Separator.A)
+	}
+	if light.Accent != (color.NRGBA{R: 0x00, G: 0x7A, B: 0xFF, A: 0xFF}) {
+		t.Fatalf("light accent = %+v", light.Accent)
+	}
+	dark := app.DarkFallback
+	if dark.Background != (color.NRGBA{R: 0x1E, G: 0x1E, B: 0x1E, A: 0xFF}) {
+		t.Fatalf("background = %+v", dark.Background)
+	}
+	if dark.Surface != (color.NRGBA{R: 0x28, G: 0x28, B: 0x28, A: 0xFF}) {
+		t.Fatalf("surface = %+v", dark.Surface)
+	}
+	separator := color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 31}
+	if dark.Separator != separator || dark.Separator == dark.Text {
+		t.Fatalf("separator = %+v text = %+v", dark.Separator, dark.Text)
+	}
+	control := color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 64}
+	if dark.Control != control {
+		t.Fatalf("control = %+v", dark.Control)
+	}
+	if dark.Text.A == 0xFF || dark.Secondary.A == 0xFF {
+		t.Fatalf("text alpha = %d secondary = %d", dark.Text.A, dark.Secondary.A)
+	}
+}
+
+func TestAcceptance_MissingAccentKeepsTheQuietSurface(t *testing.T) {
+	background := color.NRGBA{R: 1, G: 2, B: 3, A: 0xFF}
+	got := app.ResolvePalette(app.AppearanceDark, app.SystemColors{
+		Background: app.OptionalColor{Color: background, Set: true},
+	})
+	want := app.DarkFallback
+	want.Background = background
+	if got != want {
+		t.Fatalf("palette = %+v, want %+v", got, want)
+	}
+}
+
 func TestAcceptance_SystemPaletteFollowsAppearance(t *testing.T) {
-	indigo := app.OptionalColor{Color: color.NRGBA{R: 0x3F, G: 0x51, B: 0xB5, A: 0xFF}, Set: true}
+	indigo := color.NRGBA{R: 0x3F, G: 0x51, B: 0xB5, A: 0xFF}
+	separator := color.NRGBA{R: 9, G: 9, B: 9, A: 40}
 	cases := []struct {
 		name       string
 		appearance app.Appearance
@@ -280,32 +328,48 @@ func TestAcceptance_SystemPaletteFollowsAppearance(t *testing.T) {
 		{name: "light fallback", appearance: app.AppearanceLight, want: app.LightFallback},
 		{name: "dark fallback", appearance: app.AppearanceDark, want: app.DarkFallback},
 		{
-			name:       "system background keeps fallback primary",
+			name:       "system background keeps the quiet roles",
 			appearance: app.AppearanceDark,
 			system: app.SystemColors{Background: app.OptionalColor{
 				Color: color.NRGBA{R: 1, G: 2, B: 3, A: 0xFF}, Set: true,
 			}},
-			want: app.Palette{
-				Background: color.NRGBA{R: 1, G: 2, B: 3, A: 0xFF},
-				Text:       app.DarkFallback.Text,
-				Primary:    app.DarkFallback.Primary,
-				OnPrimary:  app.DarkFallback.OnPrimary,
-			},
+			want: func() app.Palette {
+				p := app.DarkFallback
+				p.Background = color.NRGBA{R: 1, G: 2, B: 3, A: 0xFF}
+				return p
+			}(),
+		},
+		{
+			name:       "supplied separator leaves the accent",
+			appearance: app.AppearanceDark,
+			system:     app.SystemColors{Separator: app.OptionalColor{Color: separator, Set: true}},
+			want: func() app.Palette {
+				p := app.DarkFallback
+				p.Separator = separator
+				return p
+			}(),
 		},
 		{
 			name:       "full system colors",
 			appearance: app.AppearanceLight,
 			system: app.SystemColors{
 				Background: app.OptionalColor{Color: color.NRGBA{R: 0x11, G: 0x22, B: 0x33, A: 0xFF}, Set: true},
-				Text:       app.OptionalColor{Color: color.NRGBA{R: 0x44, G: 0x55, B: 0x66, A: 0xFF}, Set: true},
-				Primary:    app.OptionalColor{Color: color.NRGBA{R: 0x77, G: 0x88, B: 0x99, A: 0xFF}, Set: true},
-				OnPrimary:  app.OptionalColor{Color: color.NRGBA{R: 0xAA, G: 0xBB, B: 0xCC, A: 0xFF}, Set: true},
+				Surface:    app.OptionalColor{Color: color.NRGBA{R: 0x10, G: 0x10, B: 0x10, A: 0xFF}, Set: true},
+				Control:    app.OptionalColor{Color: color.NRGBA{R: 0x20, G: 0x20, B: 0x20, A: 0x40}, Set: true},
+				Text:       app.OptionalColor{Color: color.NRGBA{R: 0x44, G: 0x55, B: 0x66, A: 0xD8}, Set: true},
+				Secondary:  app.OptionalColor{Color: color.NRGBA{R: 0x44, G: 0x55, B: 0x66, A: 0x80}, Set: true},
+				Separator:  app.OptionalColor{Color: separator, Set: true},
+				Accent:     app.OptionalColor{Color: color.NRGBA{R: 0x77, G: 0x88, B: 0x99, A: 0xFF}, Set: true},
 			},
 			want: app.Palette{
 				Background: color.NRGBA{R: 0x11, G: 0x22, B: 0x33, A: 0xFF},
-				Text:       color.NRGBA{R: 0x44, G: 0x55, B: 0x66, A: 0xFF},
-				Primary:    color.NRGBA{R: 0x77, G: 0x88, B: 0x99, A: 0xFF},
-				OnPrimary:  color.NRGBA{R: 0xAA, G: 0xBB, B: 0xCC, A: 0xFF},
+				Surface:    color.NRGBA{R: 0x10, G: 0x10, B: 0x10, A: 0xFF},
+				Control:    color.NRGBA{R: 0x20, G: 0x20, B: 0x20, A: 0x40},
+				Text:       color.NRGBA{R: 0x44, G: 0x55, B: 0x66, A: 0xD8},
+				Secondary:  color.NRGBA{R: 0x44, G: 0x55, B: 0x66, A: 0x80},
+				Separator:  separator,
+				Accent:     color.NRGBA{R: 0x77, G: 0x88, B: 0x99, A: 0xFF},
+				OnAccent:   app.LightFallback.OnAccent,
 			},
 		},
 	}
@@ -315,8 +379,8 @@ func TestAcceptance_SystemPaletteFollowsAppearance(t *testing.T) {
 			if got != tc.want {
 				t.Fatalf("palette = %+v, want %+v", got, tc.want)
 			}
-			if got.Primary == indigo.Color {
-				t.Fatalf("primary = indigo")
+			if got.Accent == indigo {
+				t.Fatalf("accent = indigo")
 			}
 		})
 	}

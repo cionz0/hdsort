@@ -104,9 +104,10 @@ sequenceDiagram
   else The owner keeps this folder
     Owner->>Window: Apply to all files of this type in this folder
   end
+  Note over Window: Accent fills only Apply and the folder action
 ```
 
-A color is the system color when the operating system provides that role. Otherwise it comes from the light or dark fallback palette, chosen by the system appearance. The window repaints when the appearance changes.
+A role is the system color when the operating system provides it, including its alpha. Otherwise it comes from the Aqua or Dark Aqua fallback. The accent fills only Apply and “Apply to all files of this type”. Every other control uses the control color, the text color, and a separator border. Borders use the separator, not the text color. Titles use the text color. Paths, sizes, hints, and row status use the secondary text color. Columns and the preview well use the surface color. The window repaints when the appearance changes.
 
 ## Vocabulary
 
