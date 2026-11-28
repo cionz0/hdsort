@@ -2,11 +2,13 @@ package gui
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -76,6 +78,7 @@ type ui struct {
 	th   *material.Theme
 
 	pick, start, dry, apply widget.Clickable
+	confirmLastClick        widget.Clickable
 	exactOnly               widget.Bool
 	list                    widget.List
 	copies                  widget.List
@@ -91,6 +94,7 @@ type ui struct {
 	applyBusy   bool
 	drying      bool
 	note        string
+	confirmLast bool
 	view        app.ScanView
 	board       app.FolderBoard
 	review      app.ReviewModel
@@ -163,6 +167,8 @@ func (u *ui) layout(gtx layout.Context) layout.Dimensions {
 	rows := append([]app.FolderRow(nil), u.board.Rows...)
 	note, banner, selected, selectedDir, root := u.note, u.review.Banner, u.selected, u.selectedDir, u.root
 	trashBusy := u.applying != ""
+	confirmLast := u.confirmLast
+	applyBusy := u.applyBusy
 	scanned := u.view.Total > 0 || u.view.Done > 0
 	u.mu.Unlock()
 	gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(time.Second)})
@@ -196,7 +202,7 @@ func (u *ui) layout(gtx layout.Context) layout.Dimensions {
 			}),
 			layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
 			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-				return u.body(gtx, rows, note, banner, selected, selectedDir, root, scanned, trashBusy)
+				return u.body(gtx, rows, note, banner, selected, selectedDir, root, scanned, trashBusy, confirmLast, applyBusy)
 			}),
 			layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
@@ -317,13 +323,25 @@ func (u *ui) rowButtons(key string) *rowButtons {
 	return b
 }
 
-func (u *ui) body(gtx layout.Context, rows []app.FolderRow, note, banner, selected, selectedDir, root string, scanned, trashBusy bool) layout.Dimensions {
+func (u *ui) body(gtx layout.Context, rows []app.FolderRow, note, banner, selected, selectedDir, root string, scanned, trashBusy, confirmLast, applyBusy bool) layout.Dimensions {
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			if note == "" {
 				return layout.Dimensions{}
 			}
-			return material.Body2(u.th, note).Layout(gtx)
+			return u.noteLines(note)(gtx)
+		}),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			if !confirmLast {
+				return layout.Dimensions{}
+			}
+			if u.confirmLastClick.Clicked(gtx) && !applyBusy {
+				u.applyAllowingLastCopy()
+			}
+			if applyBusy {
+				gtx = gtx.Disabled()
+			}
+			return layout.Inset{Top: unit.Dp(8)}.Layout(gtx, u.accentButton(&u.confirmLastClick, "Trash the last copies"))
 		}),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			if banner == "" {
@@ -632,6 +650,7 @@ func (u *ui) choose() {
 	} else {
 		u.root = root
 		u.note = ""
+		u.confirmLast = false
 	}
 	u.mu.Unlock()
 	u.win.Invalidate()
@@ -656,6 +675,7 @@ func (u *ui) begin() {
 	u.expanded = map[string]bool{filepath.Clean(root): true}
 	u.thumbs = map[string]image.Image{}
 	u.note = ""
+	u.confirmLast = false
 	u.mu.Unlock()
 	go u.scan(root, exactOnly)
 }
@@ -729,6 +749,61 @@ func (u *ui) loadThumbs() {
 	}
 }
 
+func (u *ui) noteLines(text string) layout.Widget {
+	return func(gtx layout.Context) layout.Dimensions {
+		parts := strings.Split(text, "\n")
+		lines := make([]layout.FlexChild, len(parts))
+		for i, part := range parts {
+			part := part
+			lines[i] = layout.Rigid(material.Body2(u.th, part).Layout)
+		}
+		return layout.Flex{Axis: layout.Vertical}.Layout(gtx, lines...)
+	}
+}
+
+func (u *ui) showLastCopy(session domain.Session, files []domain.FileRef, suffix string) {
+	paths, err := app.LastCopyPaths(session, files, u.deps.Library)
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if err != nil {
+		u.confirmLast = false
+		u.note = err.Error()
+		return
+	}
+	u.confirmLast = true
+	u.note = app.LastCopyQuestion(u.root, paths)
+	if suffix != "" {
+		u.note += "\n" + suffix
+	}
+}
+
+func (u *ui) applyAllowingLastCopy() {
+	u.mu.Lock()
+	if u.applyBusy {
+		u.mu.Unlock()
+		return
+	}
+	u.applyBusy = true
+	u.confirmLast = false
+	session := u.session
+	files := append([]domain.FileRef(nil), u.files...)
+	u.mu.Unlock()
+	go func() {
+		next, err := app.ApplyAllowingLastCopy(session, files, u.deps.Library, progressTrash{inner: u.deps.Trash, ui: u}, u.deps.Disk)
+		u.mu.Lock()
+		u.applyBusy = false
+		u.applying = ""
+		if err != nil {
+			u.note = err.Error()
+		} else {
+			u.session = next
+			u.note = "Applied."
+		}
+		u.mu.Unlock()
+		u.win.Invalidate()
+	}()
+}
+
 func (u *ui) dryRun() {
 	u.mu.Lock()
 	if u.drying {
@@ -741,8 +816,17 @@ func (u *ui) dryRun() {
 	u.mu.Unlock()
 	go func() {
 		report, err := app.DryRun(session, files, u.deps.Library, u.deps.Trash, u.deps.Disk)
+		if errors.Is(err, domain.ErrLastCopy) {
+			u.mu.Lock()
+			u.drying = false
+			u.mu.Unlock()
+			u.showLastCopy(session, files, app.NothingChanged)
+			u.win.Invalidate()
+			return
+		}
 		u.mu.Lock()
 		u.drying = false
+		u.confirmLast = false
 		if err != nil {
 			u.note = err.Error() + "\n" + app.NothingChanged
 		} else {
@@ -875,9 +959,19 @@ func (u *ui) applyPlan() {
 	u.mu.Unlock()
 	go func() {
 		next, err := app.Apply(session, files, u.deps.Library, progressTrash{inner: u.deps.Trash, ui: u}, u.deps.Disk)
+		if errors.Is(err, domain.ErrLastCopy) {
+			u.mu.Lock()
+			u.applyBusy = false
+			u.applying = ""
+			u.mu.Unlock()
+			u.showLastCopy(session, files, "")
+			u.win.Invalidate()
+			return
+		}
 		u.mu.Lock()
 		u.applyBusy = false
 		u.applying = ""
+		u.confirmLast = false
 		if err != nil {
 			u.note = err.Error()
 		} else {

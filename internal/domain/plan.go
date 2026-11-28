@@ -48,7 +48,39 @@ func CheckPlan(p Plan) error {
 	return checkLastCopy(p.Files, p.Library, trash)
 }
 
+// LostCopyPaths returns every file path whose content ID would have no copy
+// left outside Trash and no valid library entry that stays out of Trash.
+func LostCopyPaths(p Plan) []string {
+	trash := make(map[string]struct{}, len(p.Trash))
+	for _, path := range p.Trash {
+		if path == "" {
+			continue
+		}
+		trash[filepath.Clean(path)] = struct{}{}
+	}
+	order, byID := groupCopies(p.Files)
+	var lost []string
+	for _, id := range order {
+		if copyRemains(byID[id], p.Library, id, trash) {
+			continue
+		}
+		lost = append(lost, byID[id]...)
+	}
+	return lost
+}
+
 func checkLastCopy(files []FileRef, library []LibraryEntry, trash map[string]struct{}) error {
+	order, byID := groupCopies(files)
+	for _, id := range order {
+		if copyRemains(byID[id], library, id, trash) {
+			continue
+		}
+		return fmt.Errorf("%w: %s", ErrLastCopy, id)
+	}
+	return nil
+}
+
+func groupCopies(files []FileRef) ([]ContentID, map[ContentID][]string) {
 	byID := make(map[ContentID][]string)
 	var order []ContentID
 	for _, f := range files {
@@ -62,14 +94,7 @@ func checkLastCopy(files []FileRef, library []LibraryEntry, trash map[string]str
 		}
 		byID[f.ContentID] = append(paths, key)
 	}
-
-	for _, id := range order {
-		if copyRemains(byID[id], library, id, trash) {
-			continue
-		}
-		return fmt.Errorf("%w: %s", ErrLastCopy, id)
-	}
-	return nil
+	return order, byID
 }
 
 // copyRemains reports whether at least one known copy of id stays out of Trash.

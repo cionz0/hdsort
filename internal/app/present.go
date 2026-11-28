@@ -36,6 +36,19 @@ func FormatSize(n int64) string {
 	return fmt.Sprintf("%.0f %s", value, suffix)
 }
 
+// LastCopyQuestion asks the owner before Apply trashes every remaining copy.
+// Each path is drawn relative to the scan root. The content ID is not included.
+func LastCopyQuestion(root string, paths []string) string {
+	var b strings.Builder
+	b.WriteString("This plan trashes every copy of a file that is not in the library.")
+	for _, path := range paths {
+		b.WriteByte('\n')
+		b.WriteString(DisplayPath(root, path))
+	}
+	b.WriteString("\nTrash them anyway?")
+	return b.String()
+}
+
 // DisplayPath is path relative to the chosen scan root. A path outside
 // that root stays unchanged.
 func DisplayPath(root, path string) string {

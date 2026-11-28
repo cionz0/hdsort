@@ -16,7 +16,7 @@ Applying a session does two steps, in this order:
 
 If any trash operation fails, the library is left unchanged and the session stays unapplied.
 
-A plan is rejected when a delete has no user confirmation, or when the plan would remove the last known copy of a content ID that is not already a library survivor.
+A plan is rejected when a delete has no user confirmation, or when the plan would remove the last known copy of a content ID that is not already a library survivor. The owner can confirm that last-copy loss. The confirmed plan then proceeds (ADR-0015). An unconfirmed plan is still rejected.
 
 The Trash port follows the Freedesktop Trash specification on Linux. macOS and Windows adapters use the platform Trash facility rather than `os.Remove`.
 

@@ -139,7 +139,13 @@ sequenceDiagram
   participant Disk as Filesystem
   participant Library as Library repository
   Owner->>Apply: Apply session
-  Apply->>Apply: Reject unconfirmed deletes and last-copy loss
+  Apply->>Apply: Reject unconfirmed deletes
+  alt The plan would trash the last copy
+    Apply-->>Owner: One relative path per file, and a confirmation
+    Owner->>Apply: Trash the last copies
+  else A copy or a library entry remains
+    Apply->>Apply: Accept the plan
+  end
   Apply->>Trash: Move each confirmed delete
   Note over Apply,Trash: The progress bar names that path relative to the scan root and Apply is disabled
   alt Every trash call succeeded
@@ -153,7 +159,7 @@ sequenceDiagram
   end
 ```
 
-The last-copy rule: if the content ID is not already a valid library entry, the plan must leave at least one copy outside Trash. A library entry is valid when it has a content ID and a path and is not stale, and it keeps the content only when that path stays out of Trash. The owner can delete in-folder copies of a file the library already keeps.
+The last-copy rule: if the content ID is not already a valid library entry, the plan must leave at least one copy outside Trash, unless the owner confirms otherwise. The window lists each file as its path relative to the scan root, one file per line, and does not show the content ID. Confirming trashes every copy and does not record that content ID in the library. Declining leaves the files where they are. A library entry is valid when it has a content ID and a path and is not stale, and it keeps the content only when that path stays out of Trash. The owner can delete in-folder copies of a file the library already keeps without this extra confirmation.
 
 A synced-folder banner does not block apply. It is shown in UC-2 so the confirmation happens with that warning already visible.
 

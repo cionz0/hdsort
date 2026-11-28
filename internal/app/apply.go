@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -44,7 +45,34 @@ type prepared struct {
 // A failed check or a failed trash call leaves the library unchanged and the
 // returned session open.
 func Apply(session domain.Session, files []domain.FileRef, lib LibraryRepository, trash Trasher, disk Relocator) (domain.Session, error) {
-	plan, err := prepare(session, files, lib)
+	return apply(session, files, lib, trash, disk, false)
+}
+
+// ApplyAllowingLastCopy is Apply after the owner confirms that every known
+// copy of a content ID may go to Trash. Any other plan rejection still stops it.
+func ApplyAllowingLastCopy(session domain.Session, files []domain.FileRef, lib LibraryRepository, trash Trasher, disk Relocator) (domain.Session, error) {
+	return apply(session, files, lib, trash, disk, true)
+}
+
+// LastCopyPaths lists the files the last-copy rule would refuse to trash.
+func LastCopyPaths(session domain.Session, files []domain.FileRef, lib LibraryRepository) ([]string, error) {
+	if session.Status() != domain.StatusOpen {
+		return nil, domain.ErrSessionNotOpen
+	}
+	library, err := lib.List()
+	if err != nil {
+		return nil, err
+	}
+	return domain.LostCopyPaths(domain.Plan{
+		Files:     files,
+		Trash:     trashPaths(session),
+		Decisions: session.Decisions,
+		Library:   library,
+	}), nil
+}
+
+func apply(session domain.Session, files []domain.FileRef, lib LibraryRepository, trash Trasher, disk Relocator, allowLastCopy bool) (domain.Session, error) {
+	plan, err := prepare(session, files, lib, allowLastCopy)
 	if err != nil {
 		return session, err
 	}
@@ -85,7 +113,7 @@ func Apply(session domain.Session, files []domain.FileRef, lib LibraryRepository
 // does not rename, and does not write the library. The session stays open.
 // A failed check returns the same error Apply would return.
 func DryRun(session domain.Session, files []domain.FileRef, lib LibraryRepository, trash Trasher, disk Relocator) (PlanReport, error) {
-	plan, err := prepare(session, files, lib)
+	plan, err := prepare(session, files, lib, false)
 	if err != nil {
 		return PlanReport{}, err
 	}
@@ -95,7 +123,7 @@ func DryRun(session domain.Session, files []domain.FileRef, lib LibraryRepositor
 	return plan.report, nil
 }
 
-func prepare(session domain.Session, files []domain.FileRef, lib LibraryRepository) (prepared, error) {
+func prepare(session domain.Session, files []domain.FileRef, lib LibraryRepository, allowLastCopy bool) (prepared, error) {
 	if session.Status() != domain.StatusOpen {
 		return prepared{}, domain.ErrSessionNotOpen
 	}
@@ -109,7 +137,7 @@ func prepare(session domain.Session, files []domain.FileRef, lib LibraryReposito
 		Trash:     trash,
 		Decisions: session.Decisions,
 		Library:   library,
-	}); err != nil {
+	}); err != nil && !(allowLastCopy && errors.Is(err, domain.ErrLastCopy)) {
 		return prepared{}, err
 	}
 	moves := confirmedMoves(session)

@@ -115,10 +115,10 @@ sequenceDiagram
       Owner->>Window: Apply to all files of this type in this folder
     end
   end
-  Note over Window: Accent fills Apply, the folder action, and Trash folder
+  Note over Window: Accent fills Apply, the folder action, Trash folder, and Trash the last copies
 ```
 
-A role is the system color when the operating system provides it, including its alpha. Otherwise it comes from the Aqua or Dark Aqua fallback. The accent fills only Apply, “Apply to all files of this type”, and “Trash this folder and its contents”. Every other control uses the control color, the text color, and a separator border. Borders use the separator, not the text color. Titles use the text color. Paths, sizes, hints, and row status use the secondary text color. Columns and the preview well use the surface color. The window repaints when the appearance changes.
+A role is the system color when the operating system provides it, including its alpha. Otherwise it comes from the Aqua or Dark Aqua fallback. The accent fills only Apply, “Apply to all files of this type”, “Trash this folder and its contents”, and “Trash the last copies”. Every other control uses the control color, the text color, and a separator border. Borders use the separator, not the text color. Titles use the text color. Paths, sizes, hints, and row status use the secondary text color. Columns and the preview well use the surface color. The window repaints when the appearance changes.
 
 ## Vocabulary
 
@@ -264,7 +264,7 @@ stateDiagram-v2
   open --> open: trash failed and the library was left unchanged
 ```
 
-Apply order is fixed (ADR-0004): validate the plan, trash the confirmed deletes, rename each confirmed move inside the scan root, then upsert survivors at their final paths. An unconfirmed move stays a proposal. A failed trash call leaves the library as it was and leaves the session open.
+Apply order is fixed (ADR-0004): validate the plan, trash the confirmed deletes, rename each confirmed move inside the scan root, then upsert survivors at their final paths. An unconfirmed move stays a proposal. A failed trash call leaves the library as it was and leaves the session open. A plan that would trash the last copy of a file the library does not keep waits for confirmation (ADR-0015). The window lists each of those files as its path relative to the scan root, one per line, and does not show the content ID. After confirmation, Apply trashes them and does not upsert that content ID.
 
 Dry-run (ADR-0009) runs that same validation and returns the operations apply would perform: Trash paths, confirmed moves, and library upserts at the survivors’ final paths. It does not call Trash, does not rename files, and does not write the library. The session stays `open`. A rejected plan returns the same rejection apply would return.
 

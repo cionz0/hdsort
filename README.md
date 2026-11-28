@@ -30,7 +30,7 @@ go build -o hdsort ./cmd/hdsort
 ./hdsort
 ```
 
-`./hdsort` opens the native review window. It does not listen and it does not open a browser. The left pane is an expandable folder outline. On a new scan only the chosen folder starts open. Each folder shows its own name. Selecting a folder offers to trash that folder and everything inside it. Selecting a duplicate set opens bordered columns. Paths are relative to the chosen folder, and sizes are shown as B, KB, MB, or GB. Open launches that copy in the default application and does not delete it. Keep, Delete, and Skip are radios; the suggestion is selected until the owner chooses. The progress bar shows paths relative to the chosen folder. A preview uses the operating-system thumbnail when that call returns one. Colors follow the system semantic colors, including their alpha, and otherwise the Aqua or Dark Aqua fallback. The accent fills Apply, the exact-folder action, and the trash-folder button. A build from source keeps the version `v0.0.0`. A release build replaces it with `-ldflags "-X main.version=vX.Y.Z"`.
+`./hdsort` opens the native review window. It does not listen and it does not open a browser. The left pane is an expandable folder outline. On a new scan only the chosen folder starts open. Each folder shows its own name. Selecting a folder offers to trash that folder and everything inside it. Selecting a duplicate set opens bordered columns. Paths are relative to the chosen folder, and sizes are shown as B, KB, MB, or GB. Open launches that copy in the default application and does not delete it. Keep, Delete, and Skip are radios; the suggestion is selected until the owner chooses. The progress bar shows paths relative to the chosen folder. A preview uses the operating-system thumbnail when that call returns one. Colors follow the system semantic colors, including their alpha, and otherwise the Aqua or Dark Aqua fallback. The accent fills Apply, the exact-folder action, the trash-folder button, and the confirmation that trashes the last copies. That confirmation lists each file by its path relative to the chosen folder. A build from source keeps the version `v0.0.0`. A release build replaces it with `-ldflags "-X main.version=vX.Y.Z"`.
 
 ## Install a release
 
@@ -50,7 +50,7 @@ The binary talks only to folders on that computer. It is not a cloud service.
 
 ## Status
 
-Prompts 01 through 20 are done. The notes under [Later ideas](#later-ideas) are not prompts and are not the next session.
+Prompts 01 through 21 are done. The notes under [Later ideas](#later-ideas) are not prompts and are not the next session.
 
 ## Later ideas
 
