@@ -30,7 +30,7 @@ go build -o hdsort ./cmd/hdsort
 ./hdsort
 ```
 
-`./hdsort` opens the native review window. It does not listen and it does not open a browser. The window keeps one list, grouped by folder, and opens the selected row as columns. Colors follow the system when it provides them, and otherwise the light or dark fallback. A build from source keeps the version `v0.0.0`. A release build replaces it with `-ldflags "-X main.version=vX.Y.Z"`.
+`./hdsort` opens the native review window. It does not listen and it does not open a browser. The list shows duplicate sets only, grouped by folder. Paths are relative to the chosen folder, and sizes are shown as B, KB, MB, or GB. The selected set opens as bordered columns with a gap between Keep, Delete, and Skip. A preview uses the operating-system thumbnail when that call returns one. Colors follow the system when it provides them, and otherwise the light or dark fallback. A build from source keeps the version `v0.0.0`. A release build replaces it with `-ldflags "-X main.version=vX.Y.Z"`.
 
 ## Install a release
 
@@ -50,7 +50,7 @@ The binary talks only to folders on that computer. It is not a cloud service.
 
 ## Status
 
-Prompts 01 through 13 are done. The notes under [Later ideas](#later-ideas) are not prompts and are not the next session.
+Prompts 01 through 14 are done. The notes under [Later ideas](#later-ideas) are not prompts and are not the next session.
 
 ## Later ideas
 

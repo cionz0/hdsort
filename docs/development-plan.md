@@ -19,6 +19,7 @@ Status below is the source of truth for “what is next.” The session that fin
 | 11 | [prompts/11-release-binaries.md](../prompts/11-release-binaries.md) | done (`cmd/hdsort`) | Cross-compiled GitHub Release binaries |
 | 12 | [prompts/12-native-window.md](../prompts/12-native-window.md) | done (`internal/app`) | Native window, scan progress, thumbnails, keeper and sizes |
 | 13 | [prompts/13-review-by-folder.md](../prompts/13-review-by-folder.md) | done (`internal/app`) | One list grouped by folder, compare columns, system colors with light and dark fallbacks |
+| 14 | [prompts/14-readable-review.md](../prompts/14-readable-review.md) | done (`internal/app`) | Duplicate sets only, relative paths, readable sizes, separated columns, system preview |
 
 ## How to run a session
 
@@ -27,7 +28,7 @@ Status below is the source of truth for “what is next.” The session that fin
 3. Keep the acceptance tests from the prompt. They are part of the definition of done (ADR-0006). Finish only when those tests and the earlier ones pass (`go test ./...`).
 4. Update the diagram and the prose if the behavior you implemented changed a document.
 5. Set this table’s status for that prompt to `done`.
-6. If the prompt closed with no errors, warnings, open questions, or leftover work, commit, push, and update MemPalace when the chat decided something the repository does not record. Then stop. Do not start the next prompt in the same session.
+6. If the prompt closed with no errors, warnings, open questions, or leftover work, commit (README changes included), push, and tag that commit with the next SemVer version. Update MemPalace when the chat decided something the repository does not record. Then stop. Do not start the next prompt in the same session.
 
 ## Current product boundary
 

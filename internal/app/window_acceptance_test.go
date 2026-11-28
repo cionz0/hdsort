@@ -186,6 +186,36 @@ func TestAcceptance_TiedGroupShowsSizesWithoutRecommendation(t *testing.T) {
 	}
 }
 
+type stubPreview struct {
+	body []byte
+	ok   bool
+	err  error
+}
+
+func (s stubPreview) Preview(string) ([]byte, bool, error) {
+	return s.body, s.ok, s.err
+}
+
+func TestAcceptance_SystemPreviewUsedWhenPresent(t *testing.T) {
+	want := []byte("system-preview")
+	got, ok, err := app.LoadPreview("page_11.json", bytes.NewReader([]byte("not an image")), 12, stubPreview{body: want, ok: true})
+	if err != nil || !ok || !bytes.Equal(got, want) {
+		t.Fatalf("preview ok=%v err=%v body=%q", ok, err, got)
+	}
+}
+
+func TestAcceptance_ImagePreviewWhenSystemHasNone(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 8, 8))
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, src); err != nil {
+		t.Fatal(err)
+	}
+	got, ok, err := app.LoadPreview("shot.png", bytes.NewReader(buf.Bytes()), int64(buf.Len()), stubPreview{})
+	if err != nil || !ok || len(got) == 0 {
+		t.Fatalf("preview ok=%v err=%v len=%d", ok, err, len(got))
+	}
+}
+
 func TestAcceptance_ImageGroupShowsThumbnail(t *testing.T) {
 	src := image.NewNRGBA(image.Rect(0, 0, 400, 20))
 	var buf bytes.Buffer

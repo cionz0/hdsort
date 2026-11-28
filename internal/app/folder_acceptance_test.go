@@ -65,6 +65,72 @@ func TestAcceptance_ReviewListsOneRowPerSetUnderItsFolder(t *testing.T) {
 	}
 }
 
+func TestAcceptance_UniqueFilesLeaveTheList(t *testing.T) {
+	root := t.TempDir()
+	only := filepath.Join(root, "only.txt")
+	writeFile(t, only, []byte("just-me"))
+	keep := filepath.Join(root, "same.txt")
+	writeFile(t, keep, []byte("same-bytes"))
+	writeFile(t, filepath.Join(root, "same (1).txt"), []byte("same-bytes"))
+
+	var live app.FolderBoard
+	live.Apply(app.ProgressEvent{Kind: app.EventQueue, Path: only, Size: 7})
+	live.Apply(app.ProgressEvent{Kind: app.EventProcessed, Path: only, Size: 7, Outcome: app.OutcomeUnique})
+	if live.Contains(only) != 0 {
+		t.Fatalf("unique rows = %d, want 0", live.Contains(only))
+	}
+
+	var board app.FolderBoard
+	result, err := app.Scan(root, "", filesystem.NewWalker(nil), filesystem.NewOpener(), hash.New(), similar.New(), true, func(ev app.ProgressEvent) {
+		board.Apply(ev)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	board.UseReview(app.Review(result.Session, nil))
+	if board.Contains(only) != 0 {
+		t.Fatalf("reviewed unique rows = %d, want 0", board.Contains(only))
+	}
+	if board.Contains(keep) != 1 {
+		t.Fatalf("duplicate rows = %d, want 1", board.Contains(keep))
+	}
+	for _, row := range board.Rows {
+		if row.Kind == app.RowFile {
+			t.Fatalf("file row remains: %+v", row)
+		}
+	}
+}
+
+func TestAcceptance_SizeIsHumanReadable(t *testing.T) {
+	cases := []struct {
+		n    int64
+		want string
+	}{
+		{n: 0, want: "0 B"},
+		{n: 1536, want: "1.5 KB"},
+		{n: 39854, want: "39 KB"},
+		{n: 5 << 20, want: "5.0 MB"},
+	}
+	for _, tc := range cases {
+		if got := app.FormatSize(tc.n); got != tc.want {
+			t.Fatalf("FormatSize(%d) = %q, want %q", tc.n, got, tc.want)
+		}
+	}
+}
+
+func TestAcceptance_PathIsRelativeToTheScanRoot(t *testing.T) {
+	root := filepath.Join(string(filepath.Separator), "Users", "cionzo", "Desktop", "delme")
+	inside := filepath.Join(root, ".activity_pages", "page_11.json")
+	want := filepath.Join(".activity_pages", "page_11.json")
+	if got := app.DisplayPath(root, inside); got != want {
+		t.Fatalf("inside = %q, want %q", got, want)
+	}
+	outside := filepath.Join(string(filepath.Separator), "tmp", "other.txt")
+	if got := app.DisplayPath(root, outside); got != outside {
+		t.Fatalf("outside = %q, want %q", got, outside)
+	}
+}
+
 func TestAcceptance_ScanStatusStaysOnTheSameRow(t *testing.T) {
 	const path = "/scans/budget.pdf"
 	var board app.FolderBoard

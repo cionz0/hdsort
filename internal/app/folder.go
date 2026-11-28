@@ -52,6 +52,10 @@ func (b *FolderBoard) Apply(ev ProgressEvent) {
 			b.Rows[i].Size = ev.Size
 		}
 	case EventProcessed:
+		if ev.Outcome == OutcomeUnique || ev.Outcome == OutcomeSymlink || ev.Outcome == OutcomeDataless {
+			b.remove(ev.Path)
+			break
+		}
 		i := b.ensure(ev.Path, ev.Size)
 		if ev.Outcome != "" {
 			b.Rows[i].Status = ev.Outcome
@@ -63,35 +67,19 @@ func (b *FolderBoard) Apply(ev ProgressEvent) {
 	b.order()
 }
 
-// UseReview replaces member rows with one row per exact or similar group.
-// The group is filed under the suggested keeper's directory, or the first
-// member's directory when the group has no recommendation.
+// UseReview replaces the list with one row per exact or similar group.
+// A file that is not in a group is not listed. The group is filed under
+// the suggested keeper's directory, or the first member's directory when
+// the group has no recommendation.
 func (b *FolderBoard) UseReview(model ReviewModel) {
-	drop := map[string]bool{}
 	var groups []FolderRow
 	for _, group := range model.Exact {
-		for _, member := range group.Members {
-			drop[filepath.Clean(member.Path)] = true
-		}
 		groups = append(groups, exactGroupRow(group))
 	}
 	for _, group := range model.Similar {
-		for _, member := range group.Members {
-			drop[filepath.Clean(member.Path)] = true
-		}
 		groups = append(groups, similarGroupRow(group))
 	}
-	kept := make([]FolderRow, 0, len(b.Rows))
-	for _, row := range b.Rows {
-		if row.Kind != RowFile {
-			continue
-		}
-		if drop[filepath.Clean(row.Members[0].Path)] {
-			continue
-		}
-		kept = append(kept, row)
-	}
-	b.Rows = append(kept, groups...)
+	b.Rows = groups
 	b.order()
 }
 
@@ -160,6 +148,18 @@ func ApplySameTypeInFolder(session domain.Session, folder, openPath string) (dom
 		}
 	}
 	return next, nil
+}
+
+func (b *FolderBoard) remove(path string) {
+	key := filepath.Clean(path)
+	kept := b.Rows[:0]
+	for _, row := range b.Rows {
+		if row.Kind == RowFile && len(row.Members) > 0 && filepath.Clean(row.Members[0].Path) == key {
+			continue
+		}
+		kept = append(kept, row)
+	}
+	b.Rows = kept
 }
 
 func (b *FolderBoard) find(path string) int {
