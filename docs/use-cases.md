@@ -77,7 +77,7 @@ sequenceDiagram
     Owner->>Window: Open
     Window-->>Owner: That file in its default application
   else The owner knows which copy to keep
-    Owner->>Window: Keep, delete, or skip one copy
+    Owner->>Window: Select Keep, Delete, or Skip
   else The owner does not know
     Owner->>Window: Skip the set
   else The owner keeps a whole folder
@@ -94,7 +94,7 @@ The recommendation the owner sees follows the rank in `docs/architecture.md`:
 
 `report_v1.pdf` and `report_final.pdf` with different bytes do not form a group. With identical bytes they do, and the version words still do not pick the keeper.
 
-The owner’s decision is stored against the file id. Nothing is trashed in this use case. Open does not record a decision: it hands the copy’s cleaned absolute path to the default application. The path on a decision is the absolute path; the window draws that path relative to the scan root and draws the size in B, KB, MB, or GB. Skip on a set records skip for every member. Applying the folder action records keep for every matching exact member in that folder and delete for members of those groups in other folders. It does not decide a similar group, and it does not decide an exact group of a different type.
+The owner’s decision is stored against the file id. Nothing is trashed in this use case. Open does not record a decision: it hands the copy’s cleaned absolute path to the default application. Keep, Delete, and Skip are radios. The selected radio is the recorded decision, or the suggestion when none is recorded. A tie leaves them clear. The path on a decision is the absolute path; the window draws that path relative to the scan root and draws the size in B, KB, MB, or GB. Skip on a set records skip for every member. Applying the folder action records keep for every matching exact member in that folder and delete for members of those groups in other folders. It does not decide a similar group, and it does not decide an exact group of a different type.
 
 When the scan root has a synced-folder path segment (`CloudStorage`, `Mobile Documents`, `Dropbox`, or `Google Drive`), the window shows the banner from `docs/architecture.md` before the owner confirms a delete.
 
@@ -119,11 +119,11 @@ sequenceDiagram
   Note over Window: A byte-identical pair never arrives here
 ```
 
-ADR-0010 fixes the fingerprints. The separation this use case already required stays: no recommended deletes, and no overlap with exact groups. The owner can still record an explicit delete on a similar-group member. An exact-only scan (ADR-0011) does not enter this use case.
+ADR-0010 fixes the fingerprints. The separation this use case already required stays: no recommended deletes, and no overlap with exact groups. The owner can still record an explicit delete on a similar-group member. A similar group leaves Keep, Delete, and Skip clear until the owner selects one. An exact-only scan (ADR-0011) does not enter this use case.
 
 ## UC-4 Apply the confirmed plan
 
-The owner asks hdsort to carry out the decisions. hdsort checks the plan, moves confirmed deletes to Trash, renames confirmed moves inside the scan root, and only then records survivors at their final paths. While a file is moving to Trash, the progress bar names that path and Apply is disabled. Dry run and Start scan stay enabled.
+The owner asks hdsort to carry out the decisions. hdsort checks the plan, moves confirmed deletes to Trash, renames confirmed moves inside the scan root, and only then records survivors at their final paths. While a file is moving to Trash, the progress bar names that path relative to the scan root and Apply is disabled. Dry run and Start scan stay enabled.
 
 ```mermaid
 sequenceDiagram
@@ -135,7 +135,7 @@ sequenceDiagram
   Owner->>Apply: Apply session
   Apply->>Apply: Reject unconfirmed deletes and last-copy loss
   Apply->>Trash: Move each confirmed delete
-  Note over Apply,Trash: The progress bar names that path and Apply is disabled
+  Note over Apply,Trash: The progress bar names that path relative to the scan root and Apply is disabled
   alt Every trash call succeeded
     Trash-->>Apply: Ok
     Apply->>Disk: Rename each confirmed move inside the root

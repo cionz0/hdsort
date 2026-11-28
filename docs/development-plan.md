@@ -22,6 +22,8 @@ Status below is the source of truth for “what is next.” The session that fin
 | 14 | [prompts/14-readable-review.md](../prompts/14-readable-review.md) | done (`internal/app`) | Duplicate sets only, relative paths, readable sizes, separated columns, system preview |
 | 15 | [prompts/15-open-copy.md](../prompts/15-open-copy.md) | done (`internal/app`) | Open one copy in the default application |
 | 16 | [prompts/16-quiet-system-colors.md](../prompts/16-quiet-system-colors.md) | done (`internal/app`) | Quiet system colors; accent only on committing actions |
+| 17 | [prompts/17-progress-relative-path.md](../prompts/17-progress-relative-path.md) | done (`internal/app`) | Progress bar paths relative to the scan root |
+| 18 | [prompts/18-choice-radios.md](../prompts/18-choice-radios.md) | done (`internal/app`) | Keep, Delete, and Skip as radios, with the suggestion selected |
 
 ## How to run a session
 

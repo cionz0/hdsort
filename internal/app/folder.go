@@ -26,6 +26,7 @@ type FolderRow struct {
 	Members           []FileSize
 	HasRecommendation bool
 	Keeper            string
+	Deletes           []FileSize
 	Text              string
 	Freed             int64
 }
@@ -235,6 +236,7 @@ func exactGroupRow(group ExactView) FolderRow {
 		Members:           group.Members,
 		HasRecommendation: group.HasRecommendation,
 		Keeper:            group.Keeper,
+		Deletes:           group.Deletes,
 		Text:              group.Text,
 		Freed:             group.Freed,
 	}

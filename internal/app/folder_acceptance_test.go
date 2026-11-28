@@ -4,7 +4,6 @@ import (
 	"image/color"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -244,24 +243,51 @@ func TestAcceptance_ApplyFolderKeepsThatFolder(t *testing.T) {
 	}
 }
 
+func TestAcceptance_ProgressLabelIsRelativeToTheScanRoot(t *testing.T) {
+	docs := filepath.Join(string(filepath.Separator), "docs")
+	notes := filepath.Join(docs, "notes", "budget.pdf")
+	var view app.ScanView
+	view.Apply(app.ProgressEvent{Kind: app.EventHashing, Path: notes, Size: 180, Stage: app.StageFull})
+	reading := app.SlotFrom(docs, view, "")
+	want := filepath.Join("notes", "budget.pdf") + " · full"
+	if reading.Label != want {
+		t.Fatalf("label = %q, want %q", reading.Label, want)
+	}
+	backup := filepath.Join(string(filepath.Separator), "backup")
+	copy := filepath.Join(backup, "Copy of photo.png")
+	trashing := app.SlotFrom(backup, app.ScanView{}, copy)
+	if trashing.Label != "Trash Copy of photo.png" {
+		t.Fatalf("trash label = %q", trashing.Label)
+	}
+	outside := filepath.Join(string(filepath.Separator), "other", "file.pdf")
+	outsideSlot := app.SlotFrom(docs, app.ScanView{}, outside)
+	if outsideSlot.Label != "Trash "+outside {
+		t.Fatalf("outside label = %q", outsideSlot.Label)
+	}
+}
+
 func TestAcceptance_RunningActionDisablesItsControl(t *testing.T) {
+	docs := filepath.Join(string(filepath.Separator), "docs")
+	budget := filepath.Join(docs, "budget.pdf")
 	var view app.ScanView
 	view.Apply(app.ProgressEvent{
 		Kind:  app.EventHashing,
-		Path:  "/docs/budget.pdf",
+		Path:  budget,
 		Size:  180,
 		Stage: app.StageFull,
 	})
-	reading := app.SlotFrom(view, "")
-	if reading.Label == "" || !strings.Contains(reading.Label, "/docs/budget.pdf") || !strings.Contains(reading.Label, "full") {
+	reading := app.SlotFrom(docs, view, "")
+	if reading.Label != "budget.pdf · full" {
 		t.Fatalf("label = %q", reading.Label)
 	}
 	if !reading.StartDisabled || reading.DryDisabled || reading.ApplyDisabled {
 		t.Fatalf("reading disables = start %v dry %v apply %v", reading.StartDisabled, reading.DryDisabled, reading.ApplyDisabled)
 	}
 
-	trashing := app.SlotFrom(app.ScanView{}, "/backup/Copy of photo.png")
-	if !strings.Contains(trashing.Label, "/backup/Copy of photo.png") {
+	backup := filepath.Join(string(filepath.Separator), "backup")
+	copy := filepath.Join(backup, "Copy of photo.png")
+	trashing := app.SlotFrom(backup, app.ScanView{}, copy)
+	if trashing.Label != "Trash Copy of photo.png" {
 		t.Fatalf("trash label = %q", trashing.Label)
 	}
 	if trashing.StartDisabled || trashing.DryDisabled || !trashing.ApplyDisabled {

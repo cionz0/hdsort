@@ -15,10 +15,11 @@ type ActionSlot struct {
 }
 
 // SlotFrom builds the action row from the scan view and, when set, the
-// path currently passed to Trash.
-func SlotFrom(view ScanView, trashing string) ActionSlot {
+// path currently passed to Trash. Paths in Label are relative to root.
+// The view and the trash path stay absolute.
+func SlotFrom(root string, view ScanView, trashing string) ActionSlot {
 	if trashing != "" {
-		return ActionSlot{Label: "Trash " + trashing, ApplyDisabled: true}
+		return ActionSlot{Label: "Trash " + DisplayPath(root, trashing), ApplyDisabled: true}
 	}
 	if view.Listing && view.Total == 0 {
 		return ActionSlot{Label: "Listing the folder…", StartDisabled: true}
@@ -35,7 +36,7 @@ func SlotFrom(view ScanView, trashing string) ActionSlot {
 	if view.CurrentPath != "" && running {
 		fraction, ok := view.Fraction()
 		return ActionSlot{
-			Label:         fmt.Sprintf("%s · %s", view.CurrentPath, view.Stage),
+			Label:         fmt.Sprintf("%s · %s", DisplayPath(root, view.CurrentPath), view.Stage),
 			Fraction:      fraction,
 			Determinate:   ok,
 			StartDisabled: true,

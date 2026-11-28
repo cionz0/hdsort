@@ -86,9 +86,9 @@ Port interfaces stay small and live next to the use case that calls them (Go Cod
 
 ## Review window
 
-The window keeps one list of duplicate sets. A file that is unique, a symlink, or a dataless placeholder is not listed. While a file is still being read it can appear; it leaves when the scan knows it is not a duplicate. An exact or similar group is one row, filed under the suggested keeper’s folder, or under the first member’s folder when the group has no recommendation. Rows from the same folder stay together. Paths drawn in the window are relative to the chosen folder. Sizes are shown as B, KB, MB, or GB. The selected row opens beside the list, separated from it by a rule. Each copy is its own bordered column: a preview, the relative path, the size, and Open, Keep, Delete, and Skip with a gap between the buttons. Open asks the operating system to open that copy in its default application. It uses the cleaned absolute path, and it does not record a decision or trash the file. The preview is the operating-system thumbnail when that call returns one. Otherwise a JPEG, PNG, or GIF uses the existing thumbnail, and any other type shows an empty preview well. The owner can skip one copy or the whole set, and can keep every file of the open type in that folder while deleting copies that live in other folders. Decisions still store the absolute path.
+The window keeps one list of duplicate sets. A file that is unique, a symlink, or a dataless placeholder is not listed. While a file is still being read it can appear; it leaves when the scan knows it is not a duplicate. An exact or similar group is one row, filed under the suggested keeper’s folder, or under the first member’s folder when the group has no recommendation. Rows from the same folder stay together. Paths drawn in the window are relative to the chosen folder. Sizes are shown as B, KB, MB, or GB. The selected row opens beside the list, separated from it by a rule. Each copy is its own bordered column: a preview, the relative path, the size, an Open button, and one radio group for Keep, Delete, and Skip. Open asks the operating system to open that copy in its default application. It uses the cleaned absolute path, and it does not record a decision or trash the file. The selected radio is the recorded decision. When there is no decision, a recommendation selects Keep on the keeper and Delete on each path in the delete list. A tie and every similar group leave the radios clear. The preview is the operating-system thumbnail when that call returns one. Otherwise a JPEG, PNG, or GIF uses the existing thumbnail, and any other type shows an empty preview well. The owner can skip one copy or the whole set, and can keep every file of the open type in that folder while deleting copies that live in other folders. Decisions still store the absolute path.
 
-Start scan, the progress bar, Dry run, and Apply share one row. The bar names the action that is running, and only that action’s control is disabled.
+Start scan, the progress bar, Dry run, and Apply share one row. The bar names the action that is running, and only that action’s control is disabled. A path in that label is relative to the scan root. The path passed to Trash stays absolute.
 
 ```mermaid
 sequenceDiagram
@@ -99,6 +99,8 @@ sequenceDiagram
   alt The owner inspects one copy
     Owner->>Window: Open
     Window-->>Owner: That file in its default application
+  else The owner chooses one copy
+    Owner->>Window: Select Keep, Delete, or Skip
   else The owner skips the set
     Owner->>Window: Skip set
   else The owner keeps this folder

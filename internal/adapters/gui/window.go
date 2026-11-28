@@ -58,7 +58,8 @@ func Run(d Deps) error {
 }
 
 type choiceButtons struct {
-	launch, keep, drop, skip widget.Clickable
+	launch widget.Clickable
+	choice widget.Enum
 }
 
 type rowButtons struct {
@@ -139,7 +140,7 @@ func (u *ui) buttons(path string) *choiceButtons {
 func (u *ui) layout(gtx layout.Context) layout.Dimensions {
 	u.refreshTheme()
 	u.mu.Lock()
-	slot := app.SlotFrom(u.view, u.applying)
+	slot := app.SlotFrom(u.root, u.view, u.applying)
 	if u.drying {
 		slot.DryDisabled = true
 	}
@@ -449,25 +450,22 @@ func (u *ui) compare(gtx layout.Context, rows []app.FolderRow, selected, root st
 		layout.Rigid(layout.Spacer{Height: unit.Dp(12)}.Layout),
 		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 			return material.List(u.th, &u.copies).Layout(gtx, len(current.Members), func(gtx layout.Context, i int) layout.Dimensions {
-				return u.copyColumn(gtx, root, current.Members[i])
+				return u.copyColumn(gtx, root, current, current.Members[i])
 			})
 		}),
 	)
 }
 
-func (u *ui) copyColumn(gtx layout.Context, root string, member app.FileSize) layout.Dimensions {
+func (u *ui) copyColumn(gtx layout.Context, root string, row app.FolderRow, member app.FileSize) layout.Dimensions {
 	b := u.buttons(member.Path)
 	if b.launch.Clicked(gtx) {
 		u.openCopy(member.Path)
 	}
-	if b.keep.Clicked(gtx) {
-		u.decide(member.Path, domain.ChoiceKeep)
-	}
-	if b.drop.Clicked(gtx) {
-		u.decide(member.Path, domain.ChoiceDelete)
-	}
-	if b.skip.Clicked(gtx) {
-		u.decide(member.Path, domain.ChoiceSkip)
+	shown := u.shownChoice(row, member.Path)
+	if b.choice.Update(gtx) {
+		u.decide(member.Path, domain.Choice(b.choice.Value))
+	} else if b.choice.Value != string(shown) {
+		b.choice.Value = string(shown)
 	}
 	gtx.Constraints.Min.X = gtx.Dp(unit.Dp(200))
 	gtx.Constraints.Max.X = gtx.Dp(unit.Dp(240))
@@ -478,34 +476,38 @@ func (u *ui) copyColumn(gtx layout.Context, root string, member app.FileSize) la
 			Width:        unit.Dp(1),
 		}.Layout(gtx, u.fill(u.palette.Surface, func(gtx layout.Context) layout.Dimensions {
 			return layout.UniformInset(unit.Dp(10)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				choice := u.choice(member.Path)
 				lines := []layout.FlexChild{
 					layout.Rigid(u.thumb(member.Path)),
 					layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
 					layout.Rigid(u.hint(app.DisplayPath(root, member.Path))),
 					layout.Rigid(layout.Spacer{Height: unit.Dp(4)}.Layout),
 					layout.Rigid(u.hint(app.FormatSize(member.Size))),
-				}
-				if choice != "" {
-					lines = append(lines,
-						layout.Rigid(layout.Spacer{Height: unit.Dp(4)}.Layout),
-						layout.Rigid(u.hint(choice)),
-					)
-				}
-				lines = append(lines,
 					layout.Rigid(layout.Spacer{Height: unit.Dp(10)}.Layout),
 					layout.Rigid(u.quietButton(&b.launch, "Open")),
 					layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
-					layout.Rigid(u.quietButton(&b.keep, "Keep")),
-					layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
-					layout.Rigid(u.quietButton(&b.drop, "Delete")),
-					layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
-					layout.Rigid(u.quietButton(&b.skip, "Skip")),
-				)
+					layout.Rigid(u.radio(&b.choice, string(domain.ChoiceKeep), "Keep")),
+					layout.Rigid(u.radio(&b.choice, string(domain.ChoiceDelete), "Delete")),
+					layout.Rigid(u.radio(&b.choice, string(domain.ChoiceSkip), "Skip")),
+				}
 				return layout.Flex{Axis: layout.Vertical}.Layout(gtx, lines...)
 			})
 		}))
 	})
+}
+
+func (u *ui) radio(group *widget.Enum, key, label string) layout.Widget {
+	return func(gtx layout.Context) layout.Dimensions {
+		btn := material.RadioButton(u.th, group, key, label)
+		btn.Color = u.palette.Text
+		btn.IconColor = u.palette.Text
+		return btn.Layout(gtx)
+	}
+}
+
+func (u *ui) shownChoice(row app.FolderRow, path string) domain.Choice {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return app.ShownChoice(u.session, row.HasRecommendation, row.Keeper, row.Deletes, path)
 }
 
 func memberPaths(row app.FolderRow) []string {
@@ -543,17 +545,6 @@ func (u *ui) thumb(path string) layout.Widget {
 			}.Layout(gtx)
 		}))
 	}
-}
-
-func (u *ui) choice(path string) string {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	for _, d := range u.session.Decisions {
-		if d.Path == path {
-			return string(d.Choice)
-		}
-	}
-	return ""
 }
 
 func (u *ui) openCopy(path string) {

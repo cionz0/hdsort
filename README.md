@@ -30,7 +30,7 @@ go build -o hdsort ./cmd/hdsort
 ./hdsort
 ```
 
-`./hdsort` opens the native review window. It does not listen and it does not open a browser. The list shows duplicate sets only, grouped by folder. Paths are relative to the chosen folder, and sizes are shown as B, KB, MB, or GB. The selected set opens as bordered columns with a gap between Open, Keep, Delete, and Skip. Open launches that copy in the default application and does not delete it. A preview uses the operating-system thumbnail when that call returns one. Colors follow the system semantic colors, including their alpha, and otherwise the Aqua or Dark Aqua fallback. The accent fills only Apply and the folder action. A build from source keeps the version `v0.0.0`. A release build replaces it with `-ldflags "-X main.version=vX.Y.Z"`.
+`./hdsort` opens the native review window. It does not listen and it does not open a browser. The list shows duplicate sets only, grouped by folder. Paths are relative to the chosen folder, and sizes are shown as B, KB, MB, or GB. The selected set opens as bordered columns. Open launches that copy in the default application and does not delete it. Keep, Delete, and Skip are radios; the suggestion is selected until the owner chooses. The progress bar shows paths relative to the chosen folder. A preview uses the operating-system thumbnail when that call returns one. Colors follow the system semantic colors, including their alpha, and otherwise the Aqua or Dark Aqua fallback. The accent fills only Apply and the folder action. A build from source keeps the version `v0.0.0`. A release build replaces it with `-ldflags "-X main.version=vX.Y.Z"`.
 
 ## Install a release
 
@@ -50,7 +50,7 @@ The binary talks only to folders on that computer. It is not a cloud service.
 
 ## Status
 
-Prompts 01 through 16 are done. The notes under [Later ideas](#later-ideas) are not prompts and are not the next session.
+Prompts 01 through 18 are done. The notes under [Later ideas](#later-ideas) are not prompts and are not the next session.
 
 ## Later ideas
 
