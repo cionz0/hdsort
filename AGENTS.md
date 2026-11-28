@@ -2,7 +2,7 @@
 
 This file is for an agent session that implements hdsort. The product behavior is specified in `docs/`. Do not invent a parallel description here.
 
-1. Read `docs/development-plan.md` and take the first prompt whose status is `not started`.
+1. If the user asked for a change and did not explicitly ask to implement it now, follow `.cursor/rules/prompt-first.mdc` and stop. Do not take the next prompt in that turn. When they do ask to implement, read `docs/development-plan.md` and take the first prompt whose status is `not started`. A new prompt assumes every prompt already in `prompts/` is implemented.
 2. Read that prompt and the documents it names.
 3. Implement only that prompt. Its `TestAcceptance_*` tests are part of the definition of done. The prompt is finished only when those tests and the tests from earlier prompts pass (`go test ./...`).
 4. Update diagrams and prose when the behavior they describe changes.

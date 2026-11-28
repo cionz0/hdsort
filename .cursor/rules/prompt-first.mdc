@@ -1,0 +1,21 @@
+---
+description: A user request becomes the next prompt unless they explicitly ask to implement it now
+alwaysApply: true
+---
+
+# Write a prompt first
+
+When the user asks for a change and does not explicitly ask to implement it now, write the next prompt and stop. Do not change product code in that turn.
+
+Assume every prompt already in `prompts/` is implemented, including a row whose status is still `not started`. The new prompt builds on that behavior and names the prompt it follows.
+
+1. Add `prompts/NN-….md` in English.
+2. Add a `not started` row in `docs/development-plan.md`.
+3. Point the README status line at that prompt. Leave the row `not started`.
+
+Implement only when the user explicitly asks to implement now. Then take the first `not started` prompt, as `AGENTS.md` says.
+
+```text
+Bad: the user describes a color change and the session edits the window
+Good: the user describes a color change, the session adds the next prompt, and the code stays as it is
+```

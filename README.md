@@ -50,7 +50,7 @@ The binary talks only to folders on that computer. It is not a cloud service.
 
 ## Status
 
-Prompts 01 through 14 are done. The notes under [Later ideas](#later-ideas) are not prompts and are not the next session.
+Prompts 01 through 14 are done. Prompts 15 and 16 are not started. The notes under [Later ideas](#later-ideas) are not prompts and are not the next session.
 
 ## Later ideas
 
