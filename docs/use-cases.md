@@ -51,7 +51,7 @@ sequenceDiagram
     Note over Scan: Similarity runs after the exact groups
   end
   Scan-->>Window: Open session with exact groups and skipped paths
-  Note over Window: One list of duplicate sets, grouped by folder. A unique file is not listed.
+  Note over Window: Expandable folder outline. The scan root starts expanded. A unique file is not listed.
 ```
 
 Two readable files with the same bytes produce the same content ID, including two empty files. Two files that share a size and share the first and last 64 KiB but differ in the middle produce different content IDs. With exact-only off, near-duplicates continue into UC-3. With exact-only on, those near-duplicates stay ungrouped.
@@ -71,17 +71,23 @@ sequenceDiagram
   else Names and library rank still tie
     Policy-->>Window: No recommendation
   end
-  Owner->>Window: Select a row in its folder
-  Window-->>Owner: Bordered columns, relative paths, sizes, and previews
-  alt The owner inspects one copy
-    Owner->>Window: Open
-    Window-->>Owner: That file in its default application
-  else The owner knows which copy to keep
-    Owner->>Window: Select Keep, Delete, or Skip
-  else The owner does not know
-    Owner->>Window: Skip the set
-  else The owner keeps a whole folder
-    Owner->>Window: Apply to all files of this type in this folder
+  Owner->>Window: Expand a folder
+  alt The owner selects a directory
+    Owner->>Window: Select the directory
+    Window-->>Owner: Trash this folder and its contents
+  else The owner selects a set
+    Owner->>Window: Select the set
+    Window-->>Owner: Bordered columns, relative paths, sizes, and previews
+    alt The owner inspects one copy
+      Owner->>Window: Open
+      Window-->>Owner: That file in its default application
+    else The owner knows which copy to keep
+      Owner->>Window: Select Keep, Delete, or Skip
+    else The owner does not know
+      Owner->>Window: Skip the set
+    else The owner keeps a whole folder
+      Owner->>Window: Apply to all files of this type in this folder
+    end
   end
 ```
 
@@ -94,7 +100,7 @@ The recommendation the owner sees follows the rank in `docs/architecture.md`:
 
 `report_v1.pdf` and `report_final.pdf` with different bytes do not form a group. With identical bytes they do, and the version words still do not pick the keeper.
 
-The owner’s decision is stored against the file id. Nothing is trashed in this use case. Open does not record a decision: it hands the copy’s cleaned absolute path to the default application. Keep, Delete, and Skip are radios. The selected radio is the recorded decision, or the suggestion when none is recorded. A tie leaves them clear. The path on a decision is the absolute path; the window draws that path relative to the scan root and draws the size in B, KB, MB, or GB. Skip on a set records skip for every member. Applying the folder action records keep for every matching exact member in that folder and delete for members of those groups in other folders. It does not decide a similar group, and it does not decide an exact group of a different type.
+The owner’s decision is stored against the file id. Open does not record a decision: it hands the copy’s cleaned absolute path to the default application. Keep, Delete, and Skip are radios. The selected radio is the recorded decision, or the suggestion when none is recorded. A tie leaves them clear. The path on a decision is the absolute path; the window draws that path relative to the scan root and draws the size in B, KB, MB, or GB. The left pane is an outline: the disclosure expands a directory, and the directory’s name selects it. Selecting a directory offers to trash that folder and everything inside it. That action calls Trash once and is not UC-4. It does not run the last-copy check and it does not write the library. A directory outside the scan root is refused. Selecting a set does not trash anything. Skip on a set records skip for every member. Applying the folder action records keep for every matching exact member in that folder and delete for members of those groups in other folders. It does not decide a similar group, and it does not decide an exact group of a different type.
 
 When the scan root has a synced-folder path segment (`CloudStorage`, `Mobile Documents`, `Dropbox`, or `Google Drive`), the window shows the banner from `docs/architecture.md` before the owner confirms a delete.
 

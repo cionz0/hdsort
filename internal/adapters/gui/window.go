@@ -66,6 +66,10 @@ type rowButtons struct {
 	open, skip, apply widget.Clickable
 }
 
+type outlineButtons struct {
+	disclosure, name widget.Clickable
+}
+
 type ui struct {
 	deps Deps
 	win  *gioapp.Window
@@ -77,24 +81,28 @@ type ui struct {
 	copies                  widget.List
 	clicks                  map[string]*choiceButtons
 	rows                    map[string]*rowButtons
+	outline                 map[string]*outlineButtons
+	folderTrash             widget.Clickable
 
-	mu        sync.Mutex
-	root      string
-	scanning  bool
-	applying  string
-	applyBusy bool
-	drying    bool
-	note      string
-	view      app.ScanView
-	board     app.FolderBoard
-	review    app.ReviewModel
-	session   domain.Session
-	files     []domain.FileRef
-	selected  string
-	thumbs    map[string]image.Image
-	palette   app.Palette
-	themeAt   time.Time
-	ops       op.Ops
+	mu          sync.Mutex
+	root        string
+	scanning    bool
+	applying    string
+	applyBusy   bool
+	drying      bool
+	note        string
+	view        app.ScanView
+	board       app.FolderBoard
+	review      app.ReviewModel
+	session     domain.Session
+	files       []domain.FileRef
+	selected    string
+	selectedDir string
+	expanded    map[string]bool
+	thumbs      map[string]image.Image
+	palette     app.Palette
+	themeAt     time.Time
+	ops         op.Ops
 }
 
 func newUI(d Deps, w *gioapp.Window) *ui {
@@ -102,15 +110,17 @@ func newUI(d Deps, w *gioapp.Window) *ui {
 	th.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
 	appearance, colors := readSystem()
 	ui := &ui{
-		deps:    d,
-		win:     w,
-		th:      th,
-		list:    widget.List{List: layout.List{Axis: layout.Vertical}},
-		copies:  widget.List{List: layout.List{Axis: layout.Horizontal}},
-		clicks:  map[string]*choiceButtons{},
-		rows:    map[string]*rowButtons{},
-		thumbs:  map[string]image.Image{},
-		palette: paintTheme(th, appearance, colors),
+		deps:     d,
+		win:      w,
+		th:       th,
+		list:     widget.List{List: layout.List{Axis: layout.Vertical}},
+		copies:   widget.List{List: layout.List{Axis: layout.Horizontal}},
+		clicks:   map[string]*choiceButtons{},
+		rows:     map[string]*rowButtons{},
+		outline:  map[string]*outlineButtons{},
+		expanded: map[string]bool{},
+		thumbs:   map[string]image.Image{},
+		palette:  paintTheme(th, appearance, colors),
 	}
 	return ui
 }
@@ -151,7 +161,8 @@ func (u *ui) layout(gtx layout.Context) layout.Dimensions {
 		}
 	}
 	rows := append([]app.FolderRow(nil), u.board.Rows...)
-	note, banner, selected, root := u.note, u.review.Banner, u.selected, u.root
+	note, banner, selected, selectedDir, root := u.note, u.review.Banner, u.selected, u.selectedDir, u.root
+	trashBusy := u.applying != ""
 	scanned := u.view.Total > 0 || u.view.Done > 0
 	u.mu.Unlock()
 	gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(time.Second)})
@@ -185,7 +196,7 @@ func (u *ui) layout(gtx layout.Context) layout.Dimensions {
 			}),
 			layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
 			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-				return u.body(gtx, rows, note, banner, selected, root, scanned)
+				return u.body(gtx, rows, note, banner, selected, selectedDir, root, scanned, trashBusy)
 			}),
 			layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
@@ -306,7 +317,7 @@ func (u *ui) rowButtons(key string) *rowButtons {
 	return b
 }
 
-func (u *ui) body(gtx layout.Context, rows []app.FolderRow, note, banner, selected, root string, scanned bool) layout.Dimensions {
+func (u *ui) body(gtx layout.Context, rows []app.FolderRow, note, banner, selected, selectedDir, root string, scanned, trashBusy bool) layout.Dimensions {
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			if note == "" {
@@ -323,13 +334,13 @@ func (u *ui) body(gtx layout.Context, rows []app.FolderRow, note, banner, select
 		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 			return layout.Flex{}.Layout(gtx,
 				layout.Flexed(0.8, func(gtx layout.Context) layout.Dimensions {
-					return u.folderList(gtx, rows, selected, root)
+					return u.folderList(gtx, rows, selected, selectedDir, root)
 				}),
 				layout.Rigid(layout.Spacer{Width: unit.Dp(12)}.Layout),
 				layout.Rigid(u.vline),
 				layout.Rigid(layout.Spacer{Width: unit.Dp(12)}.Layout),
 				layout.Flexed(1.2, func(gtx layout.Context) layout.Dimensions {
-					return u.compare(gtx, rows, selected, root, scanned)
+					return u.compare(gtx, rows, selected, selectedDir, root, scanned, trashBusy)
 				}),
 			)
 		}),
@@ -348,41 +359,77 @@ func (u *ui) vline(gtx layout.Context) layout.Dimensions {
 	return layout.Dimensions{Size: image.Pt(w, h)}
 }
 
-func (u *ui) folderList(gtx layout.Context, rows []app.FolderRow, selected, root string) layout.Dimensions {
-	type item struct {
-		heading string
-		row     *app.FolderRow
+func (u *ui) folderList(gtx layout.Context, rows []app.FolderRow, selected, selectedDir, root string) layout.Dimensions {
+	if root == "" {
+		return material.Body2(u.th, "Choose a folder and start a scan.").Layout(gtx)
 	}
-	var items []item
-	prev := ""
-	for i := range rows {
-		row := &rows[i]
-		if row.Folder != prev {
-			items = append(items, item{heading: row.Folder})
-			prev = row.Folder
+	u.mu.Lock()
+	var expanded []string
+	for path, on := range u.expanded {
+		if on {
+			expanded = append(expanded, path)
 		}
-		items = append(items, item{row: row})
 	}
-	return material.List(u.th, &u.list).Layout(gtx, len(items), func(gtx layout.Context, i int) layout.Dimensions {
-		if items[i].heading != "" {
-			label := app.DisplayPath(root, items[i].heading)
-			if label == "." {
-				label = filepath.Base(root)
+	u.mu.Unlock()
+	nodes := app.Outline(root, rows, expanded)
+	open := map[string]bool{}
+	for _, path := range expanded {
+		open[filepath.Clean(path)] = true
+	}
+	return material.List(u.th, &u.list).Layout(gtx, len(nodes), func(gtx layout.Context, i int) layout.Dimensions {
+		node := nodes[i]
+		inset := layout.Inset{Top: unit.Dp(2), Bottom: unit.Dp(2), Left: unit.Dp(16 * node.Depth)}
+		if node.Directory {
+			b := u.outlineButtons(node.Path)
+			if b.disclosure.Clicked(gtx) {
+				u.toggleDir(node.Path)
 			}
-			return layout.Inset{Top: unit.Dp(12), Bottom: unit.Dp(4)}.Layout(gtx, material.H6(u.th, label).Layout)
+			if b.name.Clicked(gtx) {
+				u.mu.Lock()
+				u.selectedDir = node.Path
+				u.selected = ""
+				u.mu.Unlock()
+			}
+			mark := "▸"
+			if open[node.Path] {
+				mark = "▾"
+			}
+			name := node.Name
+			if node.Path == selectedDir {
+				name = "● " + name
+			}
+			return inset.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						return b.disclosure.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							label := material.Body1(u.th, mark)
+							label.Color = u.palette.Secondary
+							return label.Layout(gtx)
+						})
+					}),
+					layout.Rigid(layout.Spacer{Width: unit.Dp(4)}.Layout),
+					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+						return b.name.Layout(gtx, material.Body1(u.th, name).Layout)
+					}),
+				)
+			})
 		}
-		row := items[i].row
+		row := rowByKey(rows, node.RowKey)
+		if row == nil {
+			return layout.Dimensions{}
+		}
 		b := u.rowButtons(row.Key)
 		if b.open.Clicked(gtx) {
 			u.mu.Lock()
 			u.selected = row.Key
+			u.selectedDir = ""
 			u.mu.Unlock()
 		}
 		title := row.Title
 		if row.Key == selected {
 			title = "● " + title
 		}
-		return layout.Inset{Top: unit.Dp(3), Bottom: unit.Dp(3), Left: unit.Dp(8)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return inset.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			return b.open.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 					layout.Rigid(material.Body1(u.th, title).Layout),
@@ -398,7 +445,10 @@ func (u *ui) folderList(gtx layout.Context, rows []app.FolderRow, selected, root
 	})
 }
 
-func (u *ui) compare(gtx layout.Context, rows []app.FolderRow, selected, root string, scanned bool) layout.Dimensions {
+func (u *ui) compare(gtx layout.Context, rows []app.FolderRow, selected, selectedDir, root string, scanned, trashBusy bool) layout.Dimensions {
+	if selectedDir != "" {
+		return u.folderPane(gtx, root, selectedDir, trashBusy)
+	}
 	var row *app.FolderRow
 	for i := range rows {
 		if rows[i].Key == selected {
@@ -602,6 +652,8 @@ func (u *ui) begin() {
 	u.session = domain.Session{}
 	u.files = nil
 	u.selected = ""
+	u.selectedDir = ""
+	u.expanded = map[string]bool{filepath.Clean(root): true}
 	u.thumbs = map[string]image.Image{}
 	u.note = ""
 	u.mu.Unlock()
@@ -699,6 +751,83 @@ func (u *ui) dryRun() {
 		u.mu.Unlock()
 		u.win.Invalidate()
 	}()
+}
+
+func (u *ui) folderPane(gtx layout.Context, root, folder string, trashBusy bool) layout.Dimensions {
+	name := app.DirectoryName(root, folder)
+	if u.folderTrash.Clicked(gtx) && !trashBusy {
+		u.trashFolder(folder)
+	}
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(material.H6(u.th, name).Layout),
+		layout.Rigid(u.hint("Trash this folder and everything inside it.")),
+		layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			if trashBusy {
+				gtx = gtx.Disabled()
+			}
+			return u.accentButton(&u.folderTrash, app.FolderTrashLabel(name))(gtx)
+		}),
+	)
+}
+
+func (u *ui) trashFolder(folder string) {
+	u.mu.Lock()
+	if u.applying != "" || u.applyBusy {
+		u.mu.Unlock()
+		return
+	}
+	u.applying = folder
+	session := u.session
+	u.mu.Unlock()
+	u.win.Invalidate()
+	go func() {
+		next, err := app.TrashFolder(session, folder, u.deps.Trash)
+		u.mu.Lock()
+		u.applying = ""
+		if err != nil {
+			u.note = err.Error()
+		} else {
+			u.session = next
+			u.board.Rows = app.DropTrashed(u.board.Rows, folder)
+			if domain.PathInside(folder, u.selectedDir) {
+				u.selectedDir = ""
+			}
+			if rowByKey(u.board.Rows, u.selected) == nil {
+				u.selected = ""
+			}
+			u.note = ""
+		}
+		u.mu.Unlock()
+		u.win.Invalidate()
+	}()
+}
+
+func (u *ui) outlineButtons(key string) *outlineButtons {
+	b := u.outline[key]
+	if b == nil {
+		b = &outlineButtons{}
+		u.outline[key] = b
+	}
+	return b
+}
+
+func (u *ui) toggleDir(path string) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if u.expanded == nil {
+		u.expanded = map[string]bool{}
+	}
+	u.expanded[path] = !u.expanded[path]
+}
+
+func rowByKey(rows []app.FolderRow, key string) *app.FolderRow {
+	for i := range rows {
+		if rows[i].Key == key {
+			return &rows[i]
+		}
+	}
+	return nil
 }
 
 func (u *ui) skipSet(paths []string) {

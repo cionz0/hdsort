@@ -86,7 +86,7 @@ Port interfaces stay small and live next to the use case that calls them (Go Cod
 
 ## Review window
 
-The window keeps one list of duplicate sets. A file that is unique, a symlink, or a dataless placeholder is not listed. While a file is still being read it can appear; it leaves when the scan knows it is not a duplicate. An exact or similar group is one row, filed under the suggested keeper’s folder, or under the first member’s folder when the group has no recommendation. Rows from the same folder stay together. Paths drawn in the window are relative to the chosen folder. Sizes are shown as B, KB, MB, or GB. The selected row opens beside the list, separated from it by a rule. Each copy is its own bordered column: a preview, the relative path, the size, an Open button, and one radio group for Keep, Delete, and Skip. Open asks the operating system to open that copy in its default application. It uses the cleaned absolute path, and it does not record a decision or trash the file. The selected radio is the recorded decision. When there is no decision, a recommendation selects Keep on the keeper and Delete on each path in the delete list. A tie and every similar group leave the radios clear. The preview is the operating-system thumbnail when that call returns one. Otherwise a JPEG, PNG, or GIF uses the existing thumbnail, and any other type shows an empty preview well. The owner can skip one copy or the whole set, and can keep every file of the open type in that folder while deleting copies that live in other folders. Decisions still store the absolute path.
+The left pane is an expandable outline of folders. The scan root is the top node. On a new scan it starts expanded and every other directory starts collapsed. Each directory shows only its own name, indented by depth, with a disclosure control. Expanding it shows the directories and the duplicate sets inside it. A file that is unique, a symlink, or a dataless placeholder is not listed. While a file is still being read it can appear; it leaves when the scan knows it is not a duplicate. An exact or similar group is one row, filed under the suggested keeper’s folder, or under the first member’s folder when the group has no recommendation. Every directory from the scan root down to that folder is a node, including a directory that has no set of its own. A folder outside the scan root is one node named with its cleaned absolute path. Clicking the disclosure toggles that directory and does not change the selection. Clicking a directory name selects that directory. The compare pane then offers one accent button that trashes the folder and everything inside it, including files that are not duplicate sets. The use case calls Trash once with that directory. It is not Apply, it does not run the last-copy check, and it does not write the library. A directory outside the scan root is refused. Clicking a set selects the set. Paths drawn in the window are relative to the chosen folder. Sizes are shown as B, KB, MB, or GB. The selected set opens beside the list, separated from it by a rule. Each copy is its own bordered column: a preview, the relative path, the size, an Open button, and one radio group for Keep, Delete, and Skip. Open asks the operating system to open that copy in its default application. It uses the cleaned absolute path, and it does not record a decision or trash the file. The selected radio is the recorded decision. When there is no decision, a recommendation selects Keep on the keeper and Delete on each path in the delete list. A tie and every similar group leave the radios clear. The preview is the operating-system thumbnail when that call returns one. Otherwise a JPEG, PNG, or GIF uses the existing thumbnail, and any other type shows an empty preview well. The owner can skip one copy or the whole set, and can keep every file of the open type in that folder while deleting copies that live in other folders. Decisions still store the absolute path.
 
 Start scan, the progress bar, Dry run, and Apply share one row. The bar names the action that is running, and only that action’s control is disabled. A path in that label is relative to the scan root. The path passed to Trash stays absolute.
 
@@ -94,22 +94,31 @@ Start scan, the progress bar, Dry run, and Apply share one row. The bar names th
 sequenceDiagram
   actor Owner
   participant Window as Review window
-  Owner->>Window: Select the next row in this folder
-  Window-->>Owner: Bordered columns, relative paths, sizes, and previews
-  alt The owner inspects one copy
-    Owner->>Window: Open
-    Window-->>Owner: That file in its default application
-  else The owner chooses one copy
-    Owner->>Window: Select Keep, Delete, or Skip
-  else The owner skips the set
-    Owner->>Window: Skip set
-  else The owner keeps this folder
-    Owner->>Window: Apply to all files of this type in this folder
+  participant Trash as Trash port
+  Owner->>Window: Expand a folder
+  alt The owner selects a directory
+    Owner->>Window: Select the directory
+    Window-->>Owner: Trash this folder and its contents
+    Owner->>Window: Trash the folder
+    Window->>Trash: Move that one directory
+  else The owner selects a set
+    Owner->>Window: Select the set
+    Window-->>Owner: Bordered columns, relative paths, sizes, and previews
+    alt The owner inspects one copy
+      Owner->>Window: Open
+      Window-->>Owner: That file in its default application
+    else The owner chooses one copy
+      Owner->>Window: Select Keep, Delete, or Skip
+    else The owner skips the set
+      Owner->>Window: Skip set
+    else The owner keeps this folder
+      Owner->>Window: Apply to all files of this type in this folder
+    end
   end
-  Note over Window: Accent fills only Apply and the folder action
+  Note over Window: Accent fills Apply, the folder action, and Trash folder
 ```
 
-A role is the system color when the operating system provides it, including its alpha. Otherwise it comes from the Aqua or Dark Aqua fallback. The accent fills only Apply and “Apply to all files of this type”. Every other control uses the control color, the text color, and a separator border. Borders use the separator, not the text color. Titles use the text color. Paths, sizes, hints, and row status use the secondary text color. Columns and the preview well use the surface color. The window repaints when the appearance changes.
+A role is the system color when the operating system provides it, including its alpha. Otherwise it comes from the Aqua or Dark Aqua fallback. The accent fills only Apply, “Apply to all files of this type”, and “Trash this folder and its contents”. Every other control uses the control color, the text color, and a separator border. Borders use the separator, not the text color. Titles use the text color. Paths, sizes, hints, and row status use the secondary text color. Columns and the preview well use the surface color. The window repaints when the appearance changes.
 
 ## Vocabulary
 
