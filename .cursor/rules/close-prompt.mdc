@@ -9,7 +9,7 @@ When a prompt finishes with no errors, no warnings, no open questions, and no le
 
 1. Commit the prompt's changes. Commit any README changes in that commit, or in an earlier commit, before the push.
 2. Push that commit.
-3. Tag that commit with the next SemVer version and push the tag. Follow `.cursor/rules/tag-on-push.mdc`.
+3. Tag that commit with the next SemVer version and push the tag. Follow `.cursor/rules/tag-on-push.mdc`, including the download of the macOS app and clearing its quarantine attribute.
 4. Update MemPalace only when the session decided something that is not already in the repository. Follow the MemPalace wing rules.
 
 Do not commit when a test fails, `go vet` reports a problem, a document and its diagram disagree, or a question for the user is still open.

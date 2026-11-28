@@ -10,6 +10,7 @@ A push that publishes project work also gets a new SemVer tag. The tag is what s
 1. Commit README changes before the push. Do not push while README edits are still uncommitted.
 2. Push the branch.
 3. Tag the commit you just pushed with the next `vMAJOR.MINOR.PATCH`, then push that tag by itself.
+4. When the GitHub Release for that tag has the macOS archive, download `hdsort_darwin_arm64.tar.gz` into `~/Downloads`, replace `~/Downloads/hdsort.app` with the copy inside it, and clear the quarantine attribute: `xattr -dr com.apple.quarantine ~/Downloads/hdsort.app`. Do not tell the owner to do that step.
 
 Choose the number from the tags already on the remote:
 
