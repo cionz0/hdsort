@@ -29,6 +29,6 @@ SQLite stays `modernc.org/sqlite`. Cgo is for the window, not for the database.
 ## Consequences
 
 - This supersedes the `CGO_ENABLED=0` sentence in ADR-0002. The loopback review page remains the product UI until the native window lands.
-- A release tag runs five build jobs, then one job publishes the archives. A job that fails does not cancel the others.
+- A release tag runs five build jobs, then one job publishes the archives. A job that fails does not cancel the others. After a successful publish, that job deletes every GitHub Release older than the two newest. The git tags stay.
 - The macOS binary is still unsigned. Gatekeeper still asks the owner to approve it. Signing stays out of scope.
 - Tests run on Ubuntu, macOS, and Windows. The host C compiler is enough; the test job does not cross-compile.

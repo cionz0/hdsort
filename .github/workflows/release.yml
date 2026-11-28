@@ -107,3 +107,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "${{ github.ref_name }}" dist/hdsort_*.tar.gz dist/hdsort_*.zip --title "${{ github.ref_name }}" --generate-notes
+      - name: Keep the two newest releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          # GitHub has no retention setting for Releases. Drop every published
+          # release after the two newest. The git tag stays.
+          gh release list --limit 1000 --exclude-drafts --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[2:] | .[].tagName' \
+            | while IFS= read -r tag; do
+                [ -n "$tag" ] || continue
+                gh release delete "$tag" --yes
+              done
