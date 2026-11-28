@@ -48,9 +48,9 @@ func CheckPlan(p Plan) error {
 	return checkLastCopy(p.Files, p.Library, trash)
 }
 
-// LostCopyPaths returns every file path whose content ID would have no copy
+// LostCopyGroups returns one path list per content ID that would have no copy
 // left outside Trash and no valid library entry that stays out of Trash.
-func LostCopyPaths(p Plan) []string {
+func LostCopyGroups(p Plan) [][]string {
 	trash := make(map[string]struct{}, len(p.Trash))
 	for _, path := range p.Trash {
 		if path == "" {
@@ -59,12 +59,22 @@ func LostCopyPaths(p Plan) []string {
 		trash[filepath.Clean(path)] = struct{}{}
 	}
 	order, byID := groupCopies(p.Files)
-	var lost []string
+	var groups [][]string
 	for _, id := range order {
 		if copyRemains(byID[id], p.Library, id, trash) {
 			continue
 		}
-		lost = append(lost, byID[id]...)
+		groups = append(groups, append([]string(nil), byID[id]...))
+	}
+	return groups
+}
+
+// LostCopyPaths returns every file path whose content ID would have no copy
+// left outside Trash and no valid library entry that stays out of Trash.
+func LostCopyPaths(p Plan) []string {
+	var lost []string
+	for _, group := range LostCopyGroups(p) {
+		lost = append(lost, group...)
 	}
 	return lost
 }

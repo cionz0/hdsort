@@ -19,3 +19,4 @@ Format: Michael Nygard, “Documenting Architecture Decisions,” 2011. <https:/
 | [0013](0013-native-review-window.md) | Native review window | Accepted |
 | [0014](0014-trash-selected-folder.md) | Trash a selected folder as one directory | Accepted |
 | [0015](0015-confirm-last-copy.md) | Confirm before trashing the last copy | Accepted |
+| [0016](0016-last-copy-warning-in-the-preview.md) | Confirm the last copy in the preview | Accepted |

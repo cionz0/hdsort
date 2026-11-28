@@ -27,6 +27,7 @@ Status below is the source of truth for “what is next.” The session that fin
 | 19 | [prompts/19-folder-outline.md](../prompts/19-folder-outline.md) | done (`internal/app`) | Expandable folder outline in the left pane |
 | 20 | [prompts/20-trash-selected-folder.md](../prompts/20-trash-selected-folder.md) | done (`internal/app`) | Trash the selected folder and everything inside it |
 | 21 | [prompts/21-confirm-last-copy.md](../prompts/21-confirm-last-copy.md) | done (`internal/app`) | Confirm before trashing the last copy, naming each file |
+| 22 | [prompts/22-last-copy-in-the-preview.md](../prompts/22-last-copy-in-the-preview.md) | done (`internal/app`) | Per-file last-copy warning in the preview pane |
 
 ## How to run a session
 

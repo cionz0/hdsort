@@ -140,9 +140,10 @@ sequenceDiagram
   participant Library as Library repository
   Owner->>Apply: Apply session
   Apply->>Apply: Reject unconfirmed deletes
-  alt The plan would trash the last copy
-    Apply-->>Owner: One relative path per file, and a confirmation
-    Owner->>Apply: Trash the last copies
+  alt The plan would trash the last copy of a file
+    Apply-->>Owner: Accent warning in that file's preview
+    Owner->>Apply: Confirm that file's copies
+    Apply-->>Owner: Apply continues when every such file is confirmed
   else A copy or a library entry remains
     Apply->>Apply: Accept the plan
   end
@@ -159,7 +160,7 @@ sequenceDiagram
   end
 ```
 
-The last-copy rule: if the content ID is not already a valid library entry, the plan must leave at least one copy outside Trash, unless the owner confirms otherwise. The window lists each file as its path relative to the scan root, one file per line, and does not show the content ID. Confirming trashes every copy and does not record that content ID in the library. Declining leaves the files where they are. A library entry is valid when it has a content ID and a path and is not stale, and it keeps the content only when that path stays out of Trash. The owner can delete in-folder copies of a file the library already keeps without this extra confirmation.
+The last-copy rule: if the content ID is not already a valid library entry, the plan must leave at least one copy outside Trash, unless the owner confirms that file. The warning is in the compare pane of that set. It uses the accent, lists each selected copy as its path relative to the scan root, and does not show the content ID. Confirming one file does not confirm another. Apply trashes nothing until every such file is confirmed, and then it continues. It does not record those content IDs in the library. Changing a choice clears that file’s confirmation. A library entry is valid when it has a content ID and a path and is not stale, and it keeps the content only when that path stays out of Trash. The owner can delete in-folder copies of a file the library already keeps without this extra confirmation.
 
 A synced-folder banner does not block apply. It is shown in UC-2 so the confirmation happens with that warning already visible.
 

@@ -78,8 +78,8 @@ type ui struct {
 	th   *material.Theme
 
 	pick, start, dry, apply widget.Clickable
-	confirmLastClick        widget.Clickable
 	exactOnly               widget.Bool
+	fileConfirms            map[string]*widget.Clickable
 	list                    widget.List
 	copies                  widget.List
 	clicks                  map[string]*choiceButtons
@@ -87,26 +87,28 @@ type ui struct {
 	outline                 map[string]*outlineButtons
 	folderTrash             widget.Clickable
 
-	mu          sync.Mutex
-	root        string
-	scanning    bool
-	applying    string
-	applyBusy   bool
-	drying      bool
-	note        string
-	confirmLast bool
-	view        app.ScanView
-	board       app.FolderBoard
-	review      app.ReviewModel
-	session     domain.Session
-	files       []domain.FileRef
-	selected    string
-	selectedDir string
-	expanded    map[string]bool
-	thumbs      map[string]image.Image
-	palette     app.Palette
-	themeAt     time.Time
-	ops         op.Ops
+	mu           sync.Mutex
+	root         string
+	scanning     bool
+	applying     string
+	applyBusy    bool
+	drying       bool
+	note         string
+	warnings     [][]string
+	confirmed    [][]string
+	applyWaiting bool
+	view         app.ScanView
+	board        app.FolderBoard
+	review       app.ReviewModel
+	session      domain.Session
+	files        []domain.FileRef
+	selected     string
+	selectedDir  string
+	expanded     map[string]bool
+	thumbs       map[string]image.Image
+	palette      app.Palette
+	themeAt      time.Time
+	ops          op.Ops
 }
 
 func newUI(d Deps, w *gioapp.Window) *ui {
@@ -114,17 +116,18 @@ func newUI(d Deps, w *gioapp.Window) *ui {
 	th.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
 	appearance, colors := readSystem()
 	ui := &ui{
-		deps:     d,
-		win:      w,
-		th:       th,
-		list:     widget.List{List: layout.List{Axis: layout.Vertical}},
-		copies:   widget.List{List: layout.List{Axis: layout.Horizontal}},
-		clicks:   map[string]*choiceButtons{},
-		rows:     map[string]*rowButtons{},
-		outline:  map[string]*outlineButtons{},
-		expanded: map[string]bool{},
-		thumbs:   map[string]image.Image{},
-		palette:  paintTheme(th, appearance, colors),
+		deps:         d,
+		win:          w,
+		th:           th,
+		list:         widget.List{List: layout.List{Axis: layout.Vertical}},
+		copies:       widget.List{List: layout.List{Axis: layout.Horizontal}},
+		clicks:       map[string]*choiceButtons{},
+		rows:         map[string]*rowButtons{},
+		fileConfirms: map[string]*widget.Clickable{},
+		outline:      map[string]*outlineButtons{},
+		expanded:     map[string]bool{},
+		thumbs:       map[string]image.Image{},
+		palette:      paintTheme(th, appearance, colors),
 	}
 	return ui
 }
@@ -167,8 +170,8 @@ func (u *ui) layout(gtx layout.Context) layout.Dimensions {
 	rows := append([]app.FolderRow(nil), u.board.Rows...)
 	note, banner, selected, selectedDir, root := u.note, u.review.Banner, u.selected, u.selectedDir, u.root
 	trashBusy := u.applying != ""
-	confirmLast := u.confirmLast
-	applyBusy := u.applyBusy
+	warnings := cloneGroups(u.warnings)
+	confirmed := cloneGroups(u.confirmed)
 	scanned := u.view.Total > 0 || u.view.Done > 0
 	u.mu.Unlock()
 	gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(time.Second)})
@@ -202,7 +205,7 @@ func (u *ui) layout(gtx layout.Context) layout.Dimensions {
 			}),
 			layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
 			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-				return u.body(gtx, rows, note, banner, selected, selectedDir, root, scanned, trashBusy, confirmLast, applyBusy)
+				return u.body(gtx, rows, note, banner, selected, selectedDir, root, scanned, trashBusy, warnings, confirmed)
 			}),
 			layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
@@ -323,25 +326,13 @@ func (u *ui) rowButtons(key string) *rowButtons {
 	return b
 }
 
-func (u *ui) body(gtx layout.Context, rows []app.FolderRow, note, banner, selected, selectedDir, root string, scanned, trashBusy, confirmLast, applyBusy bool) layout.Dimensions {
+func (u *ui) body(gtx layout.Context, rows []app.FolderRow, note, banner, selected, selectedDir, root string, scanned, trashBusy bool, warnings, confirmed [][]string) layout.Dimensions {
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			if note == "" {
 				return layout.Dimensions{}
 			}
 			return u.noteLines(note)(gtx)
-		}),
-		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			if !confirmLast {
-				return layout.Dimensions{}
-			}
-			if u.confirmLastClick.Clicked(gtx) && !applyBusy {
-				u.applyAllowingLastCopy()
-			}
-			if applyBusy {
-				gtx = gtx.Disabled()
-			}
-			return layout.Inset{Top: unit.Dp(8)}.Layout(gtx, u.accentButton(&u.confirmLastClick, "Trash the last copies"))
 		}),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			if banner == "" {
@@ -352,13 +343,13 @@ func (u *ui) body(gtx layout.Context, rows []app.FolderRow, note, banner, select
 		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 			return layout.Flex{}.Layout(gtx,
 				layout.Flexed(0.8, func(gtx layout.Context) layout.Dimensions {
-					return u.folderList(gtx, rows, selected, selectedDir, root)
+					return u.folderList(gtx, rows, selected, selectedDir, root, warnings, confirmed)
 				}),
 				layout.Rigid(layout.Spacer{Width: unit.Dp(12)}.Layout),
 				layout.Rigid(u.vline),
 				layout.Rigid(layout.Spacer{Width: unit.Dp(12)}.Layout),
 				layout.Flexed(1.2, func(gtx layout.Context) layout.Dimensions {
-					return u.compare(gtx, rows, selected, selectedDir, root, scanned, trashBusy)
+					return u.compare(gtx, rows, selected, selectedDir, root, scanned, trashBusy, warnings, confirmed)
 				}),
 			)
 		}),
@@ -377,7 +368,7 @@ func (u *ui) vline(gtx layout.Context) layout.Dimensions {
 	return layout.Dimensions{Size: image.Pt(w, h)}
 }
 
-func (u *ui) folderList(gtx layout.Context, rows []app.FolderRow, selected, selectedDir, root string) layout.Dimensions {
+func (u *ui) folderList(gtx layout.Context, rows []app.FolderRow, selected, selectedDir, root string, warnings, confirmed [][]string) layout.Dimensions {
 	if root == "" {
 		return material.Body2(u.th, "Choose a folder and start a scan.").Layout(gtx)
 	}
@@ -444,13 +435,23 @@ func (u *ui) folderList(gtx layout.Context, rows []app.FolderRow, selected, sele
 			u.mu.Unlock()
 		}
 		title := row.Title
+		needs := rowNeedsConfirmation(*row, warnings, confirmed)
+		if needs {
+			title = "! " + title
+		}
 		if row.Key == selected {
 			title = "● " + title
 		}
 		return inset.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			return b.open.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-					layout.Rigid(material.Body1(u.th, title).Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						label := material.Body1(u.th, title)
+						if needs {
+							label.Color = u.palette.Accent
+						}
+						return label.Layout(gtx)
+					}),
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 						if row.Status == "" {
 							return layout.Dimensions{}
@@ -463,7 +464,7 @@ func (u *ui) folderList(gtx layout.Context, rows []app.FolderRow, selected, sele
 	})
 }
 
-func (u *ui) compare(gtx layout.Context, rows []app.FolderRow, selected, selectedDir, root string, scanned, trashBusy bool) layout.Dimensions {
+func (u *ui) compare(gtx layout.Context, rows []app.FolderRow, selected, selectedDir, root string, scanned, trashBusy bool, warnings, confirmed [][]string) layout.Dimensions {
 	if selectedDir != "" {
 		return u.folderPane(gtx, root, selectedDir, trashBusy)
 	}
@@ -516,6 +517,9 @@ func (u *ui) compare(gtx layout.Context, rows []app.FolderRow, selected, selecte
 			return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
 		}),
 		layout.Rigid(layout.Spacer{Height: unit.Dp(12)}.Layout),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return u.lastCopyWarnings(gtx, root, current, warnings, confirmed)
+		}),
 		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 			return material.List(u.th, &u.copies).Layout(gtx, len(current.Members), func(gtx layout.Context, i int) layout.Dimensions {
 				return u.copyColumn(gtx, root, current, current.Members[i])
@@ -637,8 +641,10 @@ func (u *ui) decide(path string, choice domain.Choice) {
 		u.note = err.Error()
 	} else {
 		u.session = next
+		u.confirmed = app.WithoutLastCopy(u.confirmed, path)
 	}
 	u.mu.Unlock()
+	u.storeWarnings()
 	u.win.Invalidate()
 }
 
@@ -650,7 +656,9 @@ func (u *ui) choose() {
 	} else {
 		u.root = root
 		u.note = ""
-		u.confirmLast = false
+		u.warnings = nil
+		u.confirmed = nil
+		u.applyWaiting = false
 	}
 	u.mu.Unlock()
 	u.win.Invalidate()
@@ -675,7 +683,9 @@ func (u *ui) begin() {
 	u.expanded = map[string]bool{filepath.Clean(root): true}
 	u.thumbs = map[string]image.Image{}
 	u.note = ""
-	u.confirmLast = false
+	u.warnings = nil
+	u.confirmed = nil
+	u.applyWaiting = false
 	u.mu.Unlock()
 	go u.scan(root, exactOnly)
 }
@@ -714,6 +724,7 @@ func (u *ui) scan(root string, exactOnly bool) {
 		u.selected = u.board.Rows[0].Key
 	}
 	u.mu.Unlock()
+	u.storeWarnings()
 	u.win.Invalidate()
 	u.loadThumbs()
 }
@@ -761,49 +772,6 @@ func (u *ui) noteLines(text string) layout.Widget {
 	}
 }
 
-func (u *ui) showLastCopy(session domain.Session, files []domain.FileRef, suffix string) {
-	paths, err := app.LastCopyPaths(session, files, u.deps.Library)
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	if err != nil {
-		u.confirmLast = false
-		u.note = err.Error()
-		return
-	}
-	u.confirmLast = true
-	u.note = app.LastCopyQuestion(u.root, paths)
-	if suffix != "" {
-		u.note += "\n" + suffix
-	}
-}
-
-func (u *ui) applyAllowingLastCopy() {
-	u.mu.Lock()
-	if u.applyBusy {
-		u.mu.Unlock()
-		return
-	}
-	u.applyBusy = true
-	u.confirmLast = false
-	session := u.session
-	files := append([]domain.FileRef(nil), u.files...)
-	u.mu.Unlock()
-	go func() {
-		next, err := app.ApplyAllowingLastCopy(session, files, u.deps.Library, progressTrash{inner: u.deps.Trash, ui: u}, u.deps.Disk)
-		u.mu.Lock()
-		u.applyBusy = false
-		u.applying = ""
-		if err != nil {
-			u.note = err.Error()
-		} else {
-			u.session = next
-			u.note = "Applied."
-		}
-		u.mu.Unlock()
-		u.win.Invalidate()
-	}()
-}
-
 func (u *ui) dryRun() {
 	u.mu.Lock()
 	if u.drying {
@@ -816,18 +784,11 @@ func (u *ui) dryRun() {
 	u.mu.Unlock()
 	go func() {
 		report, err := app.DryRun(session, files, u.deps.Library, u.deps.Trash, u.deps.Disk)
-		if errors.Is(err, domain.ErrLastCopy) {
-			u.mu.Lock()
-			u.drying = false
-			u.mu.Unlock()
-			u.showLastCopy(session, files, app.NothingChanged)
-			u.win.Invalidate()
-			return
-		}
 		u.mu.Lock()
 		u.drying = false
-		u.confirmLast = false
-		if err != nil {
+		if errors.Is(err, domain.ErrLastCopy) {
+			u.note = app.NothingChanged
+		} else if err != nil {
 			u.note = err.Error() + "\n" + app.NothingChanged
 		} else {
 			u.note = app.FormatDryRun(report)
@@ -922,8 +883,12 @@ func (u *ui) skipSet(paths []string) {
 	} else {
 		u.session = next
 		u.note = ""
+		for _, path := range paths {
+			u.confirmed = app.WithoutLastCopy(u.confirmed, path)
+		}
 	}
 	u.mu.Unlock()
+	u.storeWarnings()
 	u.win.Invalidate()
 }
 
@@ -942,8 +907,12 @@ func (u *ui) applyFolder(row app.FolderRow) {
 	} else {
 		u.session = next
 		u.note = ""
+		for _, member := range row.Members {
+			u.confirmed = app.WithoutLastCopy(u.confirmed, member.Path)
+		}
 	}
 	u.mu.Unlock()
+	u.storeWarnings()
 	u.win.Invalidate()
 }
 
@@ -953,34 +922,207 @@ func (u *ui) applyPlan() {
 		u.mu.Unlock()
 		return
 	}
-	u.applyBusy = true
 	session := u.session
 	files := append([]domain.FileRef(nil), u.files...)
+	confirmed := cloneGroups(u.confirmed)
 	u.mu.Unlock()
+	groups, err := app.LastCopyGroups(session, files, u.deps.Library)
+	u.mu.Lock()
+	if err != nil {
+		u.note = err.Error()
+		u.mu.Unlock()
+		u.win.Invalidate()
+		return
+	}
+	u.warnings = groups
+	if pendingLastCopies(groups, confirmed) {
+		u.applyWaiting = true
+		u.note = ""
+		u.mu.Unlock()
+		u.win.Invalidate()
+		return
+	}
+	u.applyWaiting = false
+	u.applyBusy = true
+	u.mu.Unlock()
+	u.finishApply(session, files, confirmed)
+}
+
+func (u *ui) finishApply(session domain.Session, files []domain.FileRef, confirmed [][]string) {
 	go func() {
-		next, err := app.Apply(session, files, u.deps.Library, progressTrash{inner: u.deps.Trash, ui: u}, u.deps.Disk)
-		if errors.Is(err, domain.ErrLastCopy) {
-			u.mu.Lock()
-			u.applyBusy = false
-			u.applying = ""
-			u.mu.Unlock()
-			u.showLastCopy(session, files, "")
-			u.win.Invalidate()
-			return
-		}
+		next, err := app.ApplyIfLastCopiesConfirmed(session, files, u.deps.Library, progressTrash{inner: u.deps.Trash, ui: u}, u.deps.Disk, confirmed)
 		u.mu.Lock()
 		u.applyBusy = false
 		u.applying = ""
-		u.confirmLast = false
-		if err != nil {
+		if errors.Is(err, domain.ErrLastCopy) {
+			u.applyWaiting = true
+			u.note = ""
+		} else if err != nil {
 			u.note = err.Error()
 		} else {
 			u.session = next
 			u.note = "Applied."
+			u.applyWaiting = false
+			u.warnings = nil
+			u.confirmed = nil
 		}
 		u.mu.Unlock()
+		u.storeWarnings()
 		u.win.Invalidate()
 	}()
+}
+
+func (u *ui) confirmFile(paths []string) {
+	u.mu.Lock()
+	if u.applyBusy {
+		u.mu.Unlock()
+		return
+	}
+	u.confirmed = append(u.confirmed, append([]string(nil), paths...))
+	waiting := u.applyWaiting
+	session := u.session
+	files := append([]domain.FileRef(nil), u.files...)
+	confirmed := cloneGroups(u.confirmed)
+	u.mu.Unlock()
+	if !waiting {
+		u.win.Invalidate()
+		return
+	}
+	groups, err := app.LastCopyGroups(session, files, u.deps.Library)
+	if err != nil {
+		u.mu.Lock()
+		u.note = err.Error()
+		u.mu.Unlock()
+		u.win.Invalidate()
+		return
+	}
+	if len(app.UnconfirmedLastCopies(groups, confirmed)) > 0 {
+		u.mu.Lock()
+		u.warnings = groups
+		u.mu.Unlock()
+		u.win.Invalidate()
+		return
+	}
+	u.mu.Lock()
+	u.warnings = groups
+	u.applyWaiting = false
+	u.applyBusy = true
+	u.mu.Unlock()
+	u.finishApply(session, files, confirmed)
+}
+
+func (u *ui) storeWarnings() {
+	u.mu.Lock()
+	session := u.session
+	files := append([]domain.FileRef(nil), u.files...)
+	u.mu.Unlock()
+	if session.Status() != domain.StatusOpen {
+		return
+	}
+	groups, err := app.LastCopyGroups(session, files, u.deps.Library)
+	if err != nil {
+		return
+	}
+	u.mu.Lock()
+	u.warnings = groups
+	u.mu.Unlock()
+}
+
+func (u *ui) lastCopyWarnings(gtx layout.Context, root string, row app.FolderRow, warnings, confirmed [][]string) layout.Dimensions {
+	pending := app.UnconfirmedLastCopies(warnings, confirmed)
+	var blocks []layout.FlexChild
+	for _, group := range pending {
+		if !rowCovers(row, group) {
+			continue
+		}
+		group := append([]string(nil), group...)
+		click := u.fileConfirm(strings.Join(group, "\n"))
+		if click.Clicked(gtx) {
+			u.confirmFile(group)
+		}
+		blocks = append(blocks, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return layout.Inset{Bottom: unit.Dp(12)}.Layout(gtx, u.fill(u.palette.Accent, func(gtx layout.Context) layout.Dimensions {
+				return layout.UniformInset(unit.Dp(12)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					lines := []layout.FlexChild{
+						layout.Rigid(u.onAccent("These are the last copies of this file.")),
+						layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
+					}
+					for _, path := range group {
+						path := path
+						lines = append(lines, layout.Rigid(u.onAccent(app.DisplayPath(root, path))))
+					}
+					lines = append(lines,
+						layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							btn := material.Button(u.th, click, "Delete these copies")
+							btn.Background = u.palette.OnAccent
+							btn.Color = u.palette.Accent
+							return btn.Layout(gtx)
+						}),
+					)
+					return layout.Flex{Axis: layout.Vertical}.Layout(gtx, lines...)
+				})
+			}))
+		}))
+	}
+	if len(blocks) == 0 {
+		return layout.Dimensions{}
+	}
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, blocks...)
+}
+
+func (u *ui) onAccent(text string) layout.Widget {
+	return func(gtx layout.Context) layout.Dimensions {
+		label := material.Body1(u.th, text)
+		label.Color = u.palette.OnAccent
+		return label.Layout(gtx)
+	}
+}
+
+func (u *ui) fileConfirm(key string) *widget.Clickable {
+	b := u.fileConfirms[key]
+	if b == nil {
+		b = new(widget.Clickable)
+		u.fileConfirms[key] = b
+	}
+	return b
+}
+
+func rowNeedsConfirmation(row app.FolderRow, warnings, confirmed [][]string) bool {
+	for _, group := range app.UnconfirmedLastCopies(warnings, confirmed) {
+		if rowCovers(row, group) {
+			return true
+		}
+	}
+	return false
+}
+
+func rowCovers(row app.FolderRow, group []string) bool {
+	if len(group) == 0 {
+		return false
+	}
+	members := map[string]struct{}{}
+	for _, member := range row.Members {
+		members[filepath.Clean(member.Path)] = struct{}{}
+	}
+	for _, path := range group {
+		if _, ok := members[filepath.Clean(path)]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func pendingLastCopies(groups, confirmed [][]string) bool {
+	return len(app.UnconfirmedLastCopies(groups, confirmed)) > 0
+}
+
+func cloneGroups(groups [][]string) [][]string {
+	out := make([][]string, len(groups))
+	for i, group := range groups {
+		out[i] = append([]string(nil), group...)
+	}
+	return out
 }
 
 type progressTrash struct {

@@ -9,7 +9,7 @@ ADR-0004 rejects a plan that would trash every known copy of a content ID the li
 
 ## Decision
 
-Apply and Dry run still detect that plan and still write nothing until the owner confirms. The window asks with one line per file. The line is the path relative to the scan root. The content ID is not shown. An accent button, “Trash the last copies”, runs the plan.
+Apply and Dry run still detect that plan and still write nothing until the owner confirms. The window asks with one line per file. The line is the path relative to the scan root. The content ID is not shown. ADR-0016 places that question in the compare pane, one file at a time.
 
 Without that confirmation the plan is still rejected. With it, Apply trashes every copy, does not upsert that content ID, and marks the session applied. A trash path with no delete decision is still rejected.
 
